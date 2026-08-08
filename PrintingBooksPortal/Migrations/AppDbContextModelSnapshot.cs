@@ -731,8 +731,7 @@ namespace PrintingBooksPortal.Migrations
                     b.HasOne("PrintingBooksPortal.Models.Tenant", "Tenant")
                         .WithMany("Settings")
                         .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.Navigation("Tenant");
                 });
