@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PrintingBooksPortal.Data;
 using PrintingBooksPortal.Models;
+using System.Net;
 
 namespace PrintingBooksPortal.Controllers;
 
@@ -53,8 +54,9 @@ public class LoginController : ControllerBase
         }
 
         // Welcome popup after sign-in (§ UI): the first page loaded after login
-        // shows a "Welcome back" confirmation toast.
-        Response.Cookies.Append("bp_welcome", Uri.EscapeDataString(user.FullName ?? user.UserName ?? ""),
+        // shows a "Welcome back" confirmation toast. Names may be stored URL-encoded
+        // (legacy data), so decode before escaping to avoid double-encoding artifacts.
+        Response.Cookies.Append("bp_welcome", Uri.EscapeDataString(WebUtility.UrlDecode(user.FullName ?? user.UserName ?? "")),
             new CookieOptions { Path = "/", SameSite = SameSiteMode.Strict, MaxAge = TimeSpan.FromMinutes(2) });
 
         if (await _userManager.IsInRoleAsync(user, "SystemAdmin")) return Redirect("/sa/dashboard");

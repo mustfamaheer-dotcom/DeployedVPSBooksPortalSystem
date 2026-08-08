@@ -76,7 +76,12 @@
         var match = document.cookie.match(/(?:^|;\s*)bp_welcome=([^;]*)/);
         if (!match) return;
         document.cookie = 'bp_welcome=; Path=/; Max-Age=0';
-        var name = decodeURIComponent(match[1] || '');
+        var name = match[1] || '';
+        try {
+            name = decodeURIComponent(name);
+        } catch (e) {
+            name = '';
+        }
         showToast(name ? 'Welcome back, ' + name + '!' : 'Welcome back!', 'success', 5000);
     }
 
