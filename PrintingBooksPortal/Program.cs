@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using PdfSharpCore.Fonts;
 using PrintingBooksPortal.Components;
 using PrintingBooksPortal.Data;
 using PrintingBooksPortal.Hubs;
@@ -9,6 +10,10 @@ using PrintingBooksPortal.Models;
 using PrintingBooksPortal.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// PdfSharpCore has no default fonts on Linux containers; resolve Arial and
+// friends from the fonts installed in the image (see Dockerfile: fonts-liberation).
+GlobalFontSettings.FontResolver = new PdfFontResolver();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 var isProduction = builder.Environment.IsProduction();

@@ -8,6 +8,12 @@ RUN dotnet restore PrintingBooksPortal/PrintingBooksPortal.csproj --verbosity qu
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
+
+# Fonts for PdfSharpCore (Liberation Sans is a metric-compatible Arial substitute)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-liberation fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /app/publish .
 ENV ASPNETCORE_HTTP_PORTS=8080
 ENV DOTNET_CLI_TELEMETRY_OPTOUT=1
