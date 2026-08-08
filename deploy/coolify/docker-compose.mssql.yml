@@ -1,6 +1,7 @@
 services:
   mssql:
     image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: booksportal-mssql
     restart: unless-stopped
     environment:
       ACCEPT_EULA: "Y"
@@ -15,3 +16,8 @@ services:
 
 volumes:
   mssql-data:
+
+networks:
+  default:
+    external: true
+    name: coolify
