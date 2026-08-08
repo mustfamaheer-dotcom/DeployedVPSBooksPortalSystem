@@ -115,8 +115,9 @@
         // ─── Display Zoom ───
         wireZoomControls();
 
-        // Initial printer detect
+        // Initial printer detect + auto-refresh every 10 seconds
         detectPrinters();
+        setInterval(function () { detectPrinters(); }, 10000);
     }
 
     // ══════════════════════════════════════

@@ -89,6 +89,8 @@ var apiKey = app.Configuration.GetValue<string>("ServerSettings:ApiKey") ?? "";
 var defaultPrinter = app.Configuration.GetValue<string>("PrinterSettings:DefaultPrinterName") ?? "";
 Console.WriteLine($"[BookShopPrintAgent] Listening on http://localhost:8080");
 Console.WriteLine($"[BookShopPrintAgent] Server: {baseUrl}");
+Console.WriteLine($"[BookShopPrintAgent] API Key: {(string.IsNullOrEmpty(apiKey) ? "(none)" : apiKey[..12] + "...")}");
+Console.WriteLine($"[BookShopPrintAgent] Agent dir: {agentDir}");
 Console.WriteLine($"[BookShopPrintAgent] Polling for jobs every 3 seconds...");
 
 _ = Task.Run(async () =>
@@ -181,7 +183,10 @@ _ = Task.Run(async () =>
                 await client.PostAsync($"{baseUrl}/api/pdf/print-agent/heartbeat", content);
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Log($"Heartbeat failed: {ex.Message}");
+        }
 
         await Task.Delay(3000);
     }

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +11,14 @@ using PrintingBooksPortal.Models;
 using PrintingBooksPortal.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Persist Data Protection keys to disk so antiforgery tokens and auth cookies
+// survive container restarts.  Without this, every restart generates a new key
+// ring and all old cookies become invalid (Blazor circuit auth fails).
+var dataProtectionPath = Path.Combine(AppContext.BaseDirectory, "DataProtection-Keys");
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionPath))
+    .SetApplicationName("BooksPortal");
 
 // PdfSharpCore has no default fonts on Linux containers; resolve Arial and
 // friends from the fonts installed in the image (see Dockerfile: fonts-liberation).

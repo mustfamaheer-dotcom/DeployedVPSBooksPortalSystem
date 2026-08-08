@@ -52,6 +52,11 @@ public class LoginController : ControllerBase
             return Redirect("/account/change-password");
         }
 
+        // Welcome popup after sign-in (§ UI): the first page loaded after login
+        // shows a "Welcome back" confirmation toast.
+        Response.Cookies.Append("bp_welcome", Uri.EscapeDataString(user.FullName ?? user.UserName ?? ""),
+            new CookieOptions { Path = "/", SameSite = SameSiteMode.Strict, MaxAge = TimeSpan.FromMinutes(2) });
+
         if (await _userManager.IsInRoleAsync(user, "SystemAdmin")) return Redirect("/sa/dashboard");
         if (await _userManager.IsInRoleAsync(user, "Teacher"))    return Redirect("/admin/dashboard");
         if (await _userManager.IsInRoleAsync(user, "Shop"))       return Redirect("/shop/mybooks");

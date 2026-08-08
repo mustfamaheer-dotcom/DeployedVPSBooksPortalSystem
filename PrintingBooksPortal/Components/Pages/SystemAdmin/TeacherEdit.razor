@@ -349,16 +349,19 @@
             if (ok)
             {
                 savedMessage = "Saved.";
+                await js.InvokeVoidAsync("showToast", "Tenant profile updated.", "success");
                 await Load();
             }
             else
             {
                 errorMessage = error;
+                await js.InvokeVoidAsync("showToast", error ?? "Save failed.", "error");
             }
         }
         catch (Exception ex)
         {
             errorMessage = $"Save failed: {ex.Message}";
+            await js.InvokeVoidAsync("showToast", errorMessage, "error");
         }
         finally
         {
@@ -374,16 +377,19 @@
             if (error != null)
             {
                 errorMessage = error;
+                await js.InvokeVoidAsync("showToast", error, "error");
             }
             else
             {
                 savedMessage = activate ? "Tenant activated." : "Tenant deactivated.";
+                await js.InvokeVoidAsync("showToast", savedMessage, "success");
                 await Load();
             }
         }
         catch (Exception ex)
         {
             errorMessage = $"Action failed: {ex.Message}";
+            await js.InvokeVoidAsync("showToast", errorMessage, "error");
         }
     }
 
@@ -403,15 +409,18 @@
             {
                 pwMessage = "Password updated.";
                 newPassword = null;
+                await js.InvokeVoidAsync("showToast", "Password updated successfully.", "success");
             }
             else
             {
                 errorMessage = error;
+                await js.InvokeVoidAsync("showToast", error ?? "Reset failed.", "error");
             }
         }
         catch (Exception ex)
         {
             errorMessage = $"Reset failed: {ex.Message}";
+            await js.InvokeVoidAsync("showToast", errorMessage, "error");
         }
         finally
         {
@@ -428,6 +437,7 @@
             if (generated == null)
             {
                 errorMessage = "Tenant not found.";
+                await js.InvokeVoidAsync("showToast", "Tenant not found.", "error");
             }
             else
             {
@@ -438,6 +448,7 @@
         catch (Exception ex)
         {
             errorMessage = $"Key generation failed: {ex.Message}";
+            await js.InvokeVoidAsync("showToast", errorMessage, "error");
         }
         finally
         {

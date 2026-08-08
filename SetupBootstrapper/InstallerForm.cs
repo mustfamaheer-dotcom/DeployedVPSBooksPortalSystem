@@ -510,8 +510,7 @@ public class InstallerForm : Form
             File.Copy(Path.Combine(tmpDir, "SumatraPDF-3.6.1-64.exe"), Path.Combine(installDir, "SumatraPDF-3.6.1-64.exe"), true);
 
             await SetProgress(70, "Writing configuration...");
-            var cfg = Path.Combine(installDir, "appsettings.json");
-            if (!File.Exists(cfg)) File.Copy(Path.Combine(tmpDir, "appsettings.json"), cfg, true);
+            File.Copy(Path.Combine(tmpDir, "appsettings.json"), Path.Combine(installDir, "appsettings.json"), true);
             File.Copy(Path.Combine(tmpDir, "book.ico"), Path.Combine(installDir, "book.ico"), true);
 
             await SetProgress(78, "Creating scheduled task...");

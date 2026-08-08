@@ -2,6 +2,7 @@
 @attribute [Authorize(Roles = "SystemAdmin")]
 @inject SystemAdminService Sa
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <div class="content-area">
     <div class="page-header">
@@ -188,9 +189,14 @@
 @if (showCreate)
 {
     <div class="modal-overlay show" @onclick="CloseCreate">
-        <div class="modal-container" @onclick:stopPropagation>
+        <div class="modal-container modal-lg" @onclick:stopPropagation>
             <div class="modal-header">
-                <h5 class="modal-title">Create Teacher &amp; Tenant</h5>
+                <h5 class="modal-title">
+                    <span class="modal-title-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+                    </span>
+                    Create Teacher &amp; Tenant
+                </h5>
                 <button type="button" class="modal-close" @onclick="CloseCreate">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
@@ -198,36 +204,63 @@
             <div class="modal-body">
                 @if (createError != null)
                 {
-                    <div class="alert alert-modern alert-danger">@createError</div>
+                    <div class="alert alert-modern alert-danger mb-3">@createError</div>
                 }
+
+                <div class="form-section-title">Tenant Details</div>
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label">Tenant / School Name *</label>
-                        <input class="form-control form-control-modern" @bind="newTeacher.Name" />
+                        <label class="form-label">Tenant / School Name <span class="req">*</span></label>
+                        <div class="field-icon-wrap">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                            <input class="form-control form-control-modern" placeholder="e.g. Al-Noor International School" @bind="newTeacher.Name" />
+                        </div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Owner Name</label>
-                        <input class="form-control form-control-modern" @bind="newTeacher.OwnerName" />
+                        <div class="field-icon-wrap">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            <input class="form-control form-control-modern" placeholder="Owner contact name" @bind="newTeacher.OwnerName" />
+                        </div>
                     </div>
+                </div>
+
+                <div class="form-section-title mt-4">Login Credentials</div>
+                <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label">Contact Email (login) *</label>
-                        <input type="email" class="form-control form-control-modern" @bind="newTeacher.ContactEmail" />
+                        <label class="form-label">Contact Email (login) <span class="req">*</span></label>
+                        <div class="field-icon-wrap">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                            <input type="email" class="form-control form-control-modern" placeholder="owner@school.com" @bind="newTeacher.ContactEmail" />
+                        </div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Phone</label>
-                        <input class="form-control form-control-modern" @bind="newTeacher.Phone" />
+                        <div class="field-icon-wrap">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                            <input class="form-control form-control-modern" placeholder="+20 100 000 0000" @bind="newTeacher.Phone" />
+                        </div>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Password *</label>
-                        <input type="password" class="form-control form-control-modern" @bind="newTeacher.Password" />
+                        <label class="form-label">Password <span class="req">*</span><span class="field-hint">min. 6 characters</span></label>
+                        <div class="field-icon-wrap pw-wrap">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            <input id="newTeacherPassword" type="password" class="form-control form-control-modern" placeholder="••••••••" @bind="newTeacher.Password" />
+                            <button type="button" class="pw-toggle" title="Show / Hide" @onclick="ToggleNewPassword">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Plan</label>
-                        <select class="form-select form-control-modern" @bind="newTeacher.Plan">
-                            <option value="">Standard</option>
-                            <option value="Pro">Pro</option>
-                            <option value="Enterprise">Enterprise</option>
-                        </select>
+                        <div class="field-icon-wrap">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+                            <select class="form-select form-control-modern" @bind="newTeacher.Plan">
+                                <option value="">Standard</option>
+                                <option value="Pro">Pro</option>
+                                <option value="Enterprise">Enterprise</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -245,7 +278,12 @@
     <div class="modal-overlay show" @onclick="() => pendingDelete = null">
         <div class="modal-container modal-sm" @onclick:stopPropagation>
             <div class="modal-header">
-                <h5 class="modal-title">Delete Teacher</h5>
+                <h5 class="modal-title">
+                    <span class="modal-title-icon" style="background:linear-gradient(135deg,#f87171,#ef4444);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </span>
+                    Delete Teacher
+                </h5>
                 <button type="button" class="modal-close" @onclick="() => pendingDelete = null">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
@@ -339,6 +377,19 @@
         newTeacher = new NewTeacherModel();
     }
 
+    private void ToggleNewPassword()
+    {
+        _showNewPassword = !_showNewPassword;
+        if (_showNewPassword)
+        {
+            JS.InvokeVoidAsync("revealPassword", "newTeacherPassword");
+        }
+        else
+        {
+            JS.InvokeVoidAsync("concealPassword", "newTeacherPassword");
+        }
+    }
+
     private async Task CreateTeacher()
     {
         busy = true;
@@ -358,14 +409,18 @@
             if (error != null)
             {
                 createError = error;
+                await JS.InvokeVoidAsync("showToast", error, "error");
                 return;
             }
+            var createdName = newTeacher.Name;
             CloseCreate();
             await Load();
+            await JS.InvokeVoidAsync("showToast", $"Teacher \"{createdName}\" created successfully.", "success");
         }
         catch (Exception ex)
         {
             createError = $"Request failed: {ex.Message}";
+            await JS.InvokeVoidAsync("showToast", createError, "error");
         }
         finally
         {
@@ -379,12 +434,20 @@
         {
             var (_, error) = await Sa.SetTeacherActiveAsync(id, activate);
             if (error != null)
+            {
                 errorMessage = error;
+                await JS.InvokeVoidAsync("showToast", error, "error");
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("showToast", activate ? "Teacher activated." : "Teacher deactivated.", "success");
+            }
             await Load();
         }
         catch (Exception ex)
         {
             errorMessage = $"Action failed: {ex.GetBaseException().Message}";
+            await JS.InvokeVoidAsync("showToast", errorMessage, "error");
         }
     }
 
@@ -398,12 +461,20 @@
         {
             var (ok, error) = await Sa.DeleteTeacherAsync(id);
             if (!ok)
+            {
                 errorMessage = error;
+                await JS.InvokeVoidAsync("showToast", error ?? "Delete failed.", "error");
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("showToast", "Teacher deleted.", "success");
+            }
             await Load();
         }
         catch (Exception ex)
         {
             errorMessage = $"Delete failed: {ex.GetBaseException().Message}";
+            await JS.InvokeVoidAsync("showToast", errorMessage, "error");
         }
         finally
         {
@@ -412,6 +483,8 @@
     }
 
     private void NavigateTo(int id) => Navigation.NavigateTo($"/sa/teachers/{id}");
+
+    private bool _showNewPassword;
 
     private static string Initials(string name)
     {

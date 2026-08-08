@@ -161,7 +161,14 @@
     {
         if (layoutModule is not null)
         {
-            await layoutModule.DisposeAsync();
+            try
+            {
+                await layoutModule.DisposeAsync();
+            }
+            catch (Microsoft.JSInterop.JSDisconnectedException)
+            {
+                // Circuit already disconnected — nothing to dispose
+            }
         }
     }
 }
