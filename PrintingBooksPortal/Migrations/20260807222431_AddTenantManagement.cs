@@ -44,13 +44,13 @@ namespace PrintingBooksPortal.Migrations
                 name: "IX_SystemSettings_Key",
                 table: "SystemSettings");
 
-            // 4. TenantId columns on all tenant-scoped tables (default 1 = default tenant; backfill §12.3)
+            // 4. TenantId columns on all tenant-scoped tables (default 1 = default tenant; backfill §12.3).
+            //    SystemSettings stays NULLABLE so global (SystemAdmin, tenantId<=0) rows can be stored with NULL.
             migrationBuilder.AddColumn<int>(
                 name: "TenantId",
                 table: "SystemSettings",
                 type: "int",
-                nullable: false,
-                defaultValue: 1);
+                nullable: true);
 
             migrationBuilder.AddColumn<int>(
                 name: "TenantId",

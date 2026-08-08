@@ -42,45 +42,8 @@
         if (overlay) overlay.style.display = 'none';
     }
 
-    document.addEventListener('keydown', function (e) {
-        var k = (e.key || '').toUpperCase();
-        var ctrl = e.ctrlKey || e.metaKey;
-        var shift = e.shiftKey;
-
-        var blockedKey =
-            e.key === 'F12' ||
-            e.key === 'F1' ||
-            (shift && e.key === 'F10') ||
-            (ctrl && shift && (k === 'I' || k === 'J' || k === 'C' || k === 'P')) ||
-            (ctrl && (k === 'U' || k === 'P' || k === 'S' || k === 'O'));
-
-        if (blockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-            showOverlay('This action is blocked on the portal.');
-            return false;
-        }
-    }, true);
-
-    document.addEventListener('contextmenu', function (e) {
-        e.preventDefault();
-    }, true);
-
     window.addEventListener('beforeprint', function (e) {
         e.preventDefault();
         showOverlay('Browser printing is disabled — use the Print button in the book viewer.');
     });
-
-    var threshold = 160;
-    setInterval(function () {
-        try {
-            var w = window.outerWidth - window.innerWidth;
-            var h = window.outerHeight - window.innerHeight;
-            if (w > threshold || h > threshold) {
-                showOverlay('Developer tools are not allowed. Close them to continue.');
-            } else {
-                hideOverlay();
-            }
-        } catch (err) { /* ignore */ }
-    }, 1000);
 })();

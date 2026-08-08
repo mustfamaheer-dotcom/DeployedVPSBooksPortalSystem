@@ -22,6 +22,9 @@ public class SettingsService : ISettingsService
 
     private int TenantId => _tenant.TenantId;
 
+    // Global (SystemAdmin) scope has no tenant row, so persist NULL to satisfy the FK
+    private int? TenantIdForStorage => TenantId > 0 ? TenantId : null;
+
     public async Task<bool> IsWatermarkEnabledAsync()
     {
         try
@@ -77,7 +80,7 @@ public class SettingsService : ISettingsService
             {
                 setting = new SystemSetting
                 {
-                    TenantId = TenantId,
+                    TenantId = TenantIdForStorage,
                     Key = SystemSettingKeys.WatermarkText,
                     ValueString = text
                 };
@@ -105,7 +108,7 @@ public class SettingsService : ISettingsService
 
             if (setting == null)
             {
-                setting = new SystemSetting { TenantId = TenantId, Key = key, ValueBool = defaultValue };
+                setting = new SystemSetting { TenantId = TenantIdForStorage, Key = key, ValueBool = defaultValue };
                 _db.SystemSettings.Add(setting);
                 await _db.SaveChangesAsync();
             }
@@ -117,7 +120,7 @@ public class SettingsService : ISettingsService
             await EnsureTableCreatedAsync();
             try
             {
-                var setting = new SystemSetting { TenantId = TenantId, Key = key, ValueBool = defaultValue };
+                var setting = new SystemSetting { TenantId = TenantIdForStorage, Key = key, ValueBool = defaultValue };
                 _db.SystemSettings.Add(setting);
                 await _db.SaveChangesAsync();
             }
@@ -138,7 +141,7 @@ public class SettingsService : ISettingsService
 
             if (setting == null)
             {
-                setting = new SystemSetting { TenantId = TenantId, Key = key, ValueBool = value };
+                setting = new SystemSetting { TenantId = TenantIdForStorage, Key = key, ValueBool = value };
                 _db.SystemSettings.Add(setting);
             }
             else
@@ -192,7 +195,9 @@ public class SettingsService : ISettingsService
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('SystemSettings') AND name = 'ValueString')
     ALTER TABLE [SystemSettings] ADD [ValueString] nvarchar(2000) NULL;
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('SystemSettings') AND name = 'TenantId')
-    ALTER TABLE [SystemSettings] ADD [TenantId] int NOT NULL DEFAULT 1;");
+    ALTER TABLE [SystemSettings] ADD [TenantId] int NULL DEFAULT 1;
+IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('SystemSettings') AND name = 'TenantId' AND is_nullable = 0)
+    ALTER TABLE [SystemSettings] ALTER COLUMN [TenantId] int NULL;");
             }
             return;
         }
@@ -213,7 +218,7 @@ BEGIN
         [Key] nvarchar(100) NOT NULL,
         [ValueBool] bit NOT NULL DEFAULT 1,
         [ValueString] nvarchar(2000) NULL,
-        [TenantId] int NOT NULL DEFAULT 1
+        [TenantId] int NULL DEFAULT 1
     );
     CREATE UNIQUE INDEX [IX_SystemSettings_TenantId_Key] ON [SystemSettings] ([TenantId], [Key]);
 END");
@@ -226,7 +231,7 @@ CREATE TABLE IF NOT EXISTS [SystemSettings] (
     [Key] TEXT NOT NULL,
     [ValueBool] INTEGER NOT NULL DEFAULT 1,
     [ValueString] TEXT NULL,
-    [TenantId] INTEGER NOT NULL DEFAULT 1
+    [TenantId] INTEGER NULL DEFAULT 1
 );
 CREATE UNIQUE INDEX IF NOT EXISTS [IX_SystemSettings_TenantId_Key] ON [SystemSettings] ([TenantId], [Key]);");
             }
