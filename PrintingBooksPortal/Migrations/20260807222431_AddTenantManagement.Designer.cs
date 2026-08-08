@@ -464,7 +464,7 @@ namespace PrintingBooksPortal.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<int>("TenantId")
+                    b.Property<int?>("TenantId")
                         .HasColumnType("int");
 
                     b.Property<bool>("ValueBool")
@@ -734,8 +734,7 @@ namespace PrintingBooksPortal.Migrations
                     b.HasOne("PrintingBooksPortal.Models.Tenant", "Tenant")
                         .WithMany("Settings")
                         .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.Navigation("Tenant");
                 });
