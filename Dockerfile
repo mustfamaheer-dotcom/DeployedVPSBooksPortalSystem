@@ -2,11 +2,9 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY PrintingBooksPortal/PrintingBooksPortal.csproj PrintingBooksPortal/
-RUN dotnet restore PrintingBooksPortal/PrintingBooksPortal.csproj --verbosity quiet
-
 COPY PrintingBooksPortal/ PrintingBooksPortal/
-RUN dotnet publish PrintingBooksPortal/PrintingBooksPortal.csproj -c Release -o /app/publish --no-restore
+RUN dotnet restore PrintingBooksPortal/PrintingBooksPortal.csproj --verbosity quiet \
+    && dotnet publish PrintingBooksPortal/PrintingBooksPortal.csproj -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
