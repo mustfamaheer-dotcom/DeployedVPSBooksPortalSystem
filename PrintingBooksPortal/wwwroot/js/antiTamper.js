@@ -56,18 +56,31 @@
     });
 
     // ── DevTools / console blocking ──────────────────────────────────────────
-    // Blocks F12, Ctrl+Shift+I/J/C, Ctrl+U and the context-menu "Inspect" path.
+    // Blocks F12, Ctrl+Shift+I/J/C, Ctrl+U, Ctrl+P and the context-menu
+    // "Inspect" path. Key values on Ctrl presses are lowercase, so compare
+    // case-insensitively.
     document.addEventListener('keydown', function (e) {
-        var k = e.key || '';
+        var k = (e.key || '').toLowerCase();
         if (
-            k === 'F12' ||
-            (e.ctrlKey && e.shiftKey && (k === 'I' || k === 'J' || k === 'C')) ||
-            (e.ctrlKey && k === 'U') ||
-            (e.ctrlKey && k === 'S')
+            k === 'f12' ||
+            (e.ctrlKey && e.shiftKey && (k === 'i' || k === 'j' || k === 'c')) ||
+            (e.ctrlKey && (k === 'u' || k === 'p' || k === 's')) ||
+            (e.metaKey && (k === 'u' || k === 'p' || k === 's'))
         ) {
             e.preventDefault();
             e.stopPropagation();
             return false;
+        }
+    }, true);
+
+    // Extra guard: cancel print dialog openings (Chrome ignores preventDefault
+    // on beforeprint in some builds, so keydown is the primary path and this
+    // is the fallback for Ctrl+P sequences that slip past it).
+    document.addEventListener('keyup', function (e) {
+        var k = (e.key || '').toLowerCase();
+        if (e.ctrlKey && (k === 'p' || k === 's')) {
+            e.preventDefault();
+            e.stopPropagation();
         }
     }, true);
 
