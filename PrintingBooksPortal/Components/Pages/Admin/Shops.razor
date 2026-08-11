@@ -1,11 +1,13 @@
 @page "/admin/shops"
 @attribute [Authorize(Roles = "Teacher,SystemAdmin")]
 @rendermode InteractiveServer
+@using Microsoft.AspNetCore.DataProtection
 @inject AppDbContext Db
 @inject UserManager<ApplicationUser> UserManager
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject ITenantContext TenantContext
+@inject IDataProtectionProvider DataProtection
 
 <div class="content-area">
     <div class="page-header">
@@ -69,7 +71,15 @@
                             </div>
                         </div>
                         <div class="alert alert-info py-2 px-3 mb-3">
-                            <small>A user account will be created for this shop with these credentials.</small>
+                            <small>A user account will be created for this shop with these credentials. The password will be stored (encrypted) so it can be viewed from the credentials button.</small>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">New Login Password (optional)</label>
+                            <InputText @bind-Value="editModel.Password" type="password" class="form-control form-control-modern" placeholder="Leave empty to keep the current password" />
+                            <div class="form-hint">Changes the shop's login password. The new password will be stored (encrypted) for viewing later.</div>
                         </div>
                     }
                     <div class="modal-actions">
@@ -158,6 +168,51 @@
         </div>
     </div>
 
+    @* View Credentials Modal *@
+    <div class="modal-overlay @(showCredModal ? "show" : "")" @onclick="() => showCredModal = false">
+        <div class="modal-container modal-sm" @onclick:stopPropagation>
+            <div class="modal-body text-center py-4">
+                <div class="delete-icon mb-3">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </div>
+                <h5 class="mb-1">Shop Credentials</h5>
+                <p class="text-muted mb-3">Login details for <strong>@credShop?.Name</strong></p>
+
+                <div class="text-start mb-3">
+                    <label class="form-label">Login (Username)</label>
+                    <div class="input-group">
+                        <input readonly value="@credLogin" class="form-control form-control-modern cred-box" />
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="CopyLogin">
+                            @(copied == "login" ? "Copied" : "Copy")
+                        </button>
+                    </div>
+                </div>
+                <div class="text-start mb-3">
+                    <label class="form-label">Password</label>
+                    @if (!string.IsNullOrEmpty(credPassword))
+                    {
+                        <div class="input-group">
+                            <input readonly value="@credPassword" class="form-control form-control-modern cred-box" />
+                            <button class="btn btn-outline-secondary btn-sm" @onclick="CopyPassword">
+                                @(copied == "password" ? "Copied" : "Copy")
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning py-2 px-3 mb-2">
+                            <small>This password was not stored and cannot be recovered. Generate a new one below.</small>
+                        </div>
+                    }
+                </div>
+                <div class="modal-actions justify-content-center">
+                    <button class="btn btn-outline-secondary" @onclick="() => showCredModal = false">Close</button>
+                    <button class="btn btn-primary" @onclick="CredToChange">Change Password</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="content-card">
         <div class="card-body p-0">
             @if (shops == null)
@@ -239,6 +294,9 @@
                                             <button class="btn-icon btn-icon-reset" title="Reset Stats" @onclick="() => { OpenReset(shop); }">
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
                                             </button>
+                                            <button class="btn-icon btn-icon-eye" title="View Login & Password" @onclick="() => OpenView(shop)">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                            </button>
                                             <button class="btn-icon btn-icon-key" title="Change Password" @onclick="() => OpenPassword(shop)">
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
                                             </button>
@@ -285,8 +343,17 @@
     private string? passError;
     private Dictionary<int, string> shopLogins = new();
 
+    private bool showCredModal;
+    private Shop? credShop;
+    private string? credLogin;
+    private string? credPassword;
+    private string copied = "";
+
+    private IDataProtector? _protector;
+
     protected override async Task OnInitializedAsync()
     {
+        _protector = DataProtection.CreateProtector("Shop.Credentials");
         await LoadShops();
     }
 
@@ -308,7 +375,53 @@
         editModel.Name = shop.Name;
         editModel.Address = shop.Address;
         editModel.Phone = shop.Phone;
+        editModel.Password = null;
         error = null;
+    }
+
+    private void OpenView(Shop shop)
+    {
+        credShop = shop;
+        credLogin = shopLogins.TryGetValue(shop.Id, out var login) ? login : "—";
+        credPassword = null;
+        if (!string.IsNullOrEmpty(shop.StoredPassword) && _protector != null)
+        {
+            try
+            {
+                credPassword = _protector.Unprotect(shop.StoredPassword);
+            }
+            catch
+            {
+                credPassword = null;
+            }
+        }
+        copied = "";
+        showCredModal = true;
+    }
+
+    private async Task CopyLogin()
+    {
+        if (!string.IsNullOrEmpty(credLogin))
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", credLogin);
+            copied = "login";
+        }
+    }
+
+    private async Task CopyPassword()
+    {
+        if (!string.IsNullOrEmpty(credPassword))
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", credPassword);
+            copied = "password";
+        }
+    }
+
+    private async Task CredToChange()
+    {
+        showCredModal = false;
+        if (credShop != null)
+            await OpenPassword(credShop);
     }
 
     private async Task SaveShop()
@@ -323,7 +436,30 @@
                 shop.Name = editModel.Name;
                 shop.Address = editModel.Address;
                 shop.Phone = editModel.Phone;
-                message = "Shop updated successfully.";
+
+                if (!string.IsNullOrWhiteSpace(editModel.Password))
+                {
+                    var user = await UserManager.Users.FirstOrDefaultAsync(u => u.ShopId == shop.Id);
+                    if (user != null)
+                    {
+                        var token = await UserManager.GeneratePasswordResetTokenAsync(user);
+                        var result = await UserManager.ResetPasswordAsync(user, token, editModel.Password);
+                        if (result.Succeeded)
+                        {
+                            shop.StoredPassword = _protector?.Protect(editModel.Password);
+                            message = "Shop updated and password changed.";
+                        }
+                        else
+                        {
+                            error = $"Failed to change password: {string.Join(", ", result.Errors.Select(e => e.Description))}";
+                            return;
+                        }
+                    }
+                }
+                else
+                {
+                    message = "Shop updated successfully.";
+                }
             }
         }
         else
@@ -345,7 +481,8 @@
             {
                 Name = editModel.Name,
                 Address = editModel.Address,
-                Phone = editModel.Phone
+                Phone = editModel.Phone,
+                StoredPassword = _protector?.Protect(editModel.Password)
             };
             Db.Shops.Add(shop);
             await Db.SaveChangesAsync();
@@ -467,6 +604,12 @@
         if (result.Succeeded)
         {
             newPassword = candidate;
+            var shop = await Db.Shops.FindAsync(passShopId);
+            if (shop != null)
+            {
+                shop.StoredPassword = _protector?.Protect(candidate);
+                await Db.SaveChangesAsync();
+            }
             message = $"Password changed for '{passShopName}'.";
         }
         else

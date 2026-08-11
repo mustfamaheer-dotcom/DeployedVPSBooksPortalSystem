@@ -15,6 +15,12 @@ public class Shop
     [MaxLength(50)]
     public string? Phone { get; set; }
 
+    // Encrypted (DataProtection) copy of the shop's login password, so the
+    // administrator can view it later. Passwords set before this field existed
+    // are not recoverable.
+    [MaxLength(2000)]
+    public string? StoredPassword { get; set; }
+
     public bool IsActive { get; set; } = true;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

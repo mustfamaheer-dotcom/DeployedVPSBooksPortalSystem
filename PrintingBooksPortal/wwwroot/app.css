@@ -239,6 +239,14 @@ a:hover { color: var(--primary-dark); }
 .btn-icon-reset:hover { background: #fef3c7; color: #d97706; }
 .btn-icon-receipt:hover { background: #ecfdf5; color: var(--success); }
 .btn-icon-key:hover { background: #f3e8ff; color: #7c3aed; }
+.btn-icon-eye:hover { background: #dbeafe; color: #2563eb; }
+.cred-box {
+    font-family: "Cascadia Mono", Consolas, monospace;
+    font-size: 0.85rem;
+    background: var(--gray-50);
+    border: 1px dashed var(--gray-300) !important;
+    word-break: break-all;
+}
 
 /* ===== Activity Timeline ===== */
 .activity-timeline { padding: 0.5rem 0; }
