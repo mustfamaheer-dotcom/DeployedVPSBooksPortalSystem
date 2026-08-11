@@ -4,6 +4,7 @@
 @inject AppDbContext Db
 @inject FileStorageService FileStorage
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <div class="content-area">
     <div class="page-header">
@@ -62,10 +63,10 @@
                             <InputNumber @bind-Value="uploadModel.PageCount" class="form-control form-control-modern" />
                         </div>
                     </div>
-                    <div class="mb-3 mt-3">
-                        <label class="form-label">PDF File</label>
-                        <div class="file-drop-zone" @ondragover="() => {}" @ondrop="() => {}">
-                            <InputFile OnChange="@OnFileSelected" accept=".pdf" id="pdfUpload" class="file-input-hidden" />
+                        <div class="mb-3 mt-3">
+                            <label class="form-label">PDF File</label>
+                            <div class="file-drop-zone" id="pdfDropZone">
+                                <InputFile OnChange="@OnFileSelected" accept=".pdf" id="pdfUpload" class="file-input-hidden" />
                             <label for="pdfUpload" class="file-drop-label">
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
                                 <span>@(selectedFileName ?? "Click to select a PDF file")</span>
@@ -182,10 +183,22 @@
     private Book? deletingBook;
     private string? message;
     private string? error;
+    private IJSObjectReference? booksModule;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadData();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Wire drag-and-drop onto the drop zone once the upload card is visible.
+        if (showUpload)
+        {
+            booksModule ??= await JS.InvokeAsync<IJSObjectReference>("import",
+                "./Components/Pages/Admin/Books.razor.js");
+            await booksModule.InvokeVoidAsync("initFileDrop");
+        }
     }
 
     private async Task LoadData()

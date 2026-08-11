@@ -446,6 +446,13 @@ a:hover { color: var(--primary-dark); }
 
 .file-drop-label:hover { background: var(--gray-50); color: var(--gray-700); }
 
+.file-drop-zone.dragover {
+    border-color: var(--primary);
+    background: rgba(26, 86, 219, 0.05);
+}
+
+.file-drop-zone.dragover .file-drop-label { color: var(--primary); }
+
 /* ===== Upload Card ===== */
 .upload-card {
     background: #fff;
