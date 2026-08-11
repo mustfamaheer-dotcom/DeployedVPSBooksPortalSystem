@@ -5,6 +5,8 @@ using PdfSharpCore;
 using PdfSharpCore.Pdf;
 using PdfSharpCore.Drawing;
 using PrintingBooksPortal.Data;
+using PrintingBooksPortal.Models;
+using PrintingBooksPortal.Services;
 
 namespace PrintingBooksPortal.Controllers;
 
@@ -15,10 +17,82 @@ namespace PrintingBooksPortal.Controllers;
 public class AdminController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly FileStorageService _fileStorage;
+    private readonly ITenantContext _tenantContext;
 
-    public AdminController(AppDbContext db)
+    public AdminController(AppDbContext db, FileStorageService fileStorage, ITenantContext tenantContext)
     {
         _db = db;
+        _fileStorage = fileStorage;
+        _tenantContext = tenantContext;
+    }
+
+    [HttpPost("books/upload")]
+    public async Task<IActionResult> UploadBook([FromForm] BookUploadRequest request, IFormFile? file)
+    {
+        const long maxSize = 100L * 1024 * 1024;
+
+        if (file == null || file.Length == 0)
+        {
+            // Metadata-only update is allowed for existing books; new books require a PDF.
+            if (request.BookId <= 0)
+                return BadRequest(new { success = false, error = "No PDF file received." });
+        }
+        else
+        {
+            if (file.Length > maxSize)
+                return BadRequest(new { success = false, error = "File exceeds the 100 MB limit." });
+            if (!Path.GetExtension(file.FileName).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { success = false, error = "Only PDF files are allowed." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Title))
+            return BadRequest(new { success = false, error = "Book title is required." });
+
+        Book? book;
+        if (request.BookId > 0)
+        {
+            book = await _db.Books.FirstOrDefaultAsync(b => b.Id == request.BookId);
+            if (book == null)
+                return NotFound(new { success = false, error = "Book not found." });
+        }
+        else
+        {
+            if (request.BoardId <= 0)
+                return BadRequest(new { success = false, error = "Please select a board." });
+
+            book = new Book { TenantId = _tenantContext.TenantId };
+            _db.Books.Add(book);
+        }
+
+        book.Title = request.Title.Trim();
+        if (request.BoardId > 0)
+            book.BoardId = request.BoardId;
+        if (request.PageCount > 0)
+            book.PageCount = request.PageCount;
+        book.IsActive = request.IsActive;
+
+        if (file != null && file.Length > 0)
+        {
+            var newFile = await _fileStorage.SaveFileAsync(file);
+            var oldFile = book.FilePath;
+            book.FilePath = newFile;
+            book.OriginalFileName = file.FileName;
+            book.FileSizeBytes = file.Length;
+            await _db.SaveChangesAsync();
+            // Remove the replaced version only after the new one is committed.
+            if (!string.IsNullOrEmpty(oldFile))
+                _fileStorage.DeleteFile(oldFile);
+        }
+        else
+        {
+            await _db.SaveChangesAsync();
+        }
+
+        var message = request.BookId > 0
+            ? $"Book '{book.Title}' updated successfully."
+            : $"Book '{book.Title}' uploaded successfully.";
+        return Ok(new { success = true, message, bookId = book.Id });
     }
 
     [HttpPost("reset-shop-stats/{shopId:int}")]
@@ -123,4 +197,13 @@ public class AdminController : ControllerBase
 public class ResetRequest
 {
     public string Password { get; set; } = "";
+}
+
+public class BookUploadRequest
+{
+    public int BookId { get; set; }
+    public string Title { get; set; } = "";
+    public int BoardId { get; set; }
+    public int PageCount { get; set; }
+    public bool IsActive { get; set; } = true;
 }

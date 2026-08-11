@@ -1,5 +1,6 @@
 @page "/admin/dashboard"
 @attribute [Authorize(Roles = "Teacher,SystemAdmin")]
+@rendermode InteractiveServer
 @inject AppDbContext Db
 @inject PrintLoggingService PrintLogging
 
@@ -11,6 +12,118 @@
         </div>
     </div>
 
+    @if (selectedShop != null)
+    {
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <button class="btn btn-outline-secondary btn-sm" @onclick="CloseShop">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1" style="vertical-align:-2px"><polyline points="15 18 9 12 15 6"/></svg>
+                Back to Dashboard
+            </button>
+            <h5 class="mb-0">@selectedShop.Name</h5>
+        </div>
+        <div class="content-card mb-4">
+            <div class="card-header"><h5>Shop Details</h5></div>
+            <div class="card-body">
+                <div class="detail-grid">
+                    <div class="detail-item"><span class="detail-label">Address</span><span class="detail-value">@(selectedShop.Address ?? "—")</span></div>
+                    <div class="detail-item"><span class="detail-label">Phone</span><span class="detail-value">@(selectedShop.Phone ?? "—")</span></div>
+                    <div class="detail-item"><span class="detail-label">Created</span><span class="detail-value">@selectedShop.CreatedAt.ToEgyptLocal().ToString("d")</span></div>
+                    <div class="detail-item"><span class="detail-label">Status</span><span class="detail-value">@(selectedShop.IsActive ? "Active" : "Inactive")</span></div>
+                    <div class="detail-item"><span class="detail-label">Total Prints</span><span class="detail-value"><strong>@totalShopPrints</strong></span></div>
+                    <div class="detail-item"><span class="detail-label">Assigned Books</span><span class="detail-value"><strong>@(shopBooks?.Count ?? 0)</strong></span></div>
+                </div>
+            </div>
+        </div>
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <div class="content-card">
+                    <div class="card-header"><h5>Assigned Books</h5></div>
+                    <div class="card-body p-0">
+                        @if (shopBooks == null || !shopBooks.Any())
+                        {
+                            <div class="empty-state">
+                                <div class="empty-icon">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                                </div>
+                                <p>No books assigned to this shop</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-container">
+                                <table class="table table-modern">
+                                    <thead>
+                                        <tr>
+                                            <th>Title</th>
+                                            <th>Board</th>
+                                            <th>Pages</th>
+                                            <th class="text-end">Copies Printed</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var assignment in shopBooks)
+                                        {
+                                            <tr>
+                                                <td><strong>@assignment.Book.Title</strong></td>
+                                                <td><span class="board-tag">@assignment.Book.Board?.Name</span></td>
+                                                <td><span class="count-badge">@assignment.Book.PageCount</span></td>
+                                                <td class="text-end">
+                                                    <span class="count-badge count-badge-primary">@(bookPrintCounts.TryGetValue(assignment.BookId, out var cnt) ? cnt : 0)</span>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <div class="content-card">
+                    <div class="card-header"><h5>Recent Prints</h5></div>
+                    <div class="card-body p-0">
+                        @if (shopLogs == null || !shopLogs.Any())
+                        {
+                            <div class="empty-state">
+                                <div class="empty-icon">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="1.5" stroke-linecap="round"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+                                </div>
+                                <p>No print activity for this shop yet</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="activity-timeline">
+                                @foreach (var log in shopLogs)
+                                {
+                                    <div class="timeline-item">
+                                        <div class="timeline-dot"></div>
+                                        <div class="timeline-content">
+                                            <div class="timeline-header">
+                                                <span class="timeline-book">@log.BookTitle</span>
+                                                <span class="timeline-time">@log.PrintedAt.ToEgyptLocal().ToString("g")</span>
+                                            </div>
+                                            <div class="timeline-body">
+                                                <span class="timeline-badge">
+                                                    <strong>@log.Copies</strong> cop@(log.Copies == 1 ? "y" : "ies")
+                                                </span>
+                                            </div>
+                                            <div class="timeline-footer">
+                                                <span class="timeline-user">by @log.PrintedByUserName</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
     <div class="row g-4 mb-4">
         <div class="col-md-3 col-6">
             <div class="stat-card stat-card-primary">
@@ -180,6 +293,43 @@
             </div>
         </div>
     </div>
+
+    <div class="content-card mt-4">
+        <div class="card-header"><h5>Bookshops</h5></div>
+        <div class="card-body p-0">
+            @if (shops.Any())
+            {
+                <div class="shop-list">
+                    @foreach (var shop in shops)
+                    {
+                        <button class="shop-row" @onclick="() => OpenShop(shop)">
+                            <span class="shop-row-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                            </span>
+                            <span class="shop-row-info">
+                                <span class="shop-row-name">@shop.Name</span>
+                                <span class="shop-row-address">@(shop.Address ?? "No address")</span>
+                            </span>
+                            <span class="shop-row-prints">@(shopPrintCounts.TryGetValue(shop.Id, out var cnt) ? cnt : 0) copies</span>
+                            <span class="shop-row-arrow">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                            </span>
+                        </button>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    </div>
+                    <p>No active shops yet</p>
+                </div>
+            }
+        </div>
+    </div>
+    }
 </div>
 
 @code {
@@ -188,6 +338,13 @@
     private int totalBoards;
     private int totalPrints;
     private List<PrintLog>? recentLogs;
+    private Shop? selectedShop;
+    private List<Shop> shops = new();
+    private Dictionary<int, int> shopPrintCounts = new();
+    private Dictionary<int, int> bookPrintCounts = new();
+    private List<ShopBookAssignment>? shopBooks;
+    private List<PrintLog>? shopLogs;
+    private int totalShopPrints;
 
     protected override async Task OnInitializedAsync()
     {
@@ -196,5 +353,37 @@
         totalBoards = await Db.EducationalBoards.CountAsync(b => b.IsActive);
         totalPrints = await PrintLogging.GetTotalPrintsAsync();
         recentLogs = await PrintLogging.GetRecentLogsAsync(5);
+
+        shops = await Db.Shops.Where(s => s.IsActive).OrderBy(s => s.Name).ToListAsync<Shop>();
+        var counts = await Db.PrintLogs
+            .GroupBy(l => l.ShopId)
+            .Select(g => new { ShopId = g.Key, Total = g.Sum(l => l.Copies) })
+            .ToListAsync();
+        shopPrintCounts = counts.ToDictionary(c => c.ShopId, c => c.Total);
+    }
+
+    private async Task OpenShop(Shop shop)
+    {
+        selectedShop = shop;
+        shopBooks = await Db.ShopBookAssignments
+            .Where(a => a.ShopId == shop.Id && a.IsActive)
+            .Include(a => a.Book)
+            .ThenInclude(b => b.Board)
+            .OrderBy(a => a.Book.Title)
+            .ToListAsync();
+        var counts = await Db.PrintLogs.Where(l => l.ShopId == shop.Id)
+            .GroupBy(l => l.BookId)
+            .Select(g => new { BookId = g.Key, Total = g.Sum(l => l.Copies) })
+            .ToListAsync();
+        bookPrintCounts = counts.ToDictionary(c => c.BookId, c => c.Total);
+        totalShopPrints = await Db.PrintLogs.Where(l => l.ShopId == shop.Id).SumAsync(l => l.Copies);
+        shopLogs = await PrintLogging.GetShopLogsAsync(shop.Id, 5);
+    }
+
+    private void CloseShop()
+    {
+        selectedShop = null;
+        shopBooks = null;
+        shopLogs = null;
     }
 }

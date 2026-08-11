@@ -238,6 +238,7 @@ a:hover { color: var(--primary-dark); }
 .btn-icon-danger:hover { background: #fef2f2; color: var(--danger); }
 .btn-icon-reset:hover { background: #fef3c7; color: #d97706; }
 .btn-icon-receipt:hover { background: #ecfdf5; color: var(--success); }
+.btn-icon-key:hover { background: #f3e8ff; color: #7c3aed; }
 
 /* ===== Activity Timeline ===== */
 .activity-timeline { padding: 0.5rem 0; }
@@ -452,6 +453,120 @@ a:hover { color: var(--primary-dark); }
 }
 
 .file-drop-zone.dragover .file-drop-label { color: var(--primary); }
+
+/* ===== Upload Progress ===== */
+.upload-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0.75rem 0 1rem;
+}
+.upload-progress-bar {
+    flex: 1;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--gray-100);
+    overflow: hidden;
+}
+.upload-progress-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: var(--primary);
+    transition: width 0.2s ease;
+}
+.upload-progress-text {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--gray-500);
+    min-width: 3rem;
+    text-align: right;
+}
+
+/* ===== Shop Credentials ===== */
+.login-email {
+    font-size: 0.85rem;
+    color: var(--gray-700);
+    word-break: break-all;
+}
+.password-mask {
+    letter-spacing: 2px;
+    color: var(--gray-500);
+    font-size: 0.85rem;
+}
+.new-password-box {
+    margin: 0.5rem 0 0.25rem;
+    padding: 0.625rem 0.875rem;
+    border: 1px dashed var(--success);
+    border-radius: var(--radius);
+    background: #ecfdf5;
+    font-family: "Consolas", "Courier New", monospace;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--success);
+    word-break: break-all;
+}
+
+/* ===== Shop List (Dashboard) ===== */
+.shop-list { padding: 0.25rem 0; }
+.shop-row {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    width: 100%;
+    padding: 0.875rem 1.25rem;
+    border: none;
+    border-bottom: 1px solid var(--gray-100);
+    background: none;
+    text-align: start;
+    cursor: pointer;
+    transition: var(--transition);
+}
+.shop-row:hover { background: var(--gray-50); }
+.shop-row:last-child { border-bottom: none; }
+.shop-row-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    background: #ecfdf5;
+    color: var(--success);
+    flex-shrink: 0;
+}
+.shop-row-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+.shop-row-name { font-weight: 600; color: var(--gray-800); }
+.shop-row-address {
+    font-size: 0.8rem;
+    color: var(--gray-500);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.shop-row-prints { font-size: 0.8rem; font-weight: 600; color: var(--primary); white-space: nowrap; }
+.shop-row-arrow { color: var(--gray-400); display: grid; place-items: center; }
+
+/* ===== Shop Detail Grid (Dashboard) ===== */
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.75rem 1rem;
+    background: var(--gray-50);
+    border-radius: var(--radius);
+}
+.detail-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gray-500); }
+.detail-value { font-size: 0.95rem; color: var(--gray-800); }
 
 /* ===== Upload Card ===== */
 .upload-card {
