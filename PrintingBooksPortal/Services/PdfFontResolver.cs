@@ -45,18 +45,28 @@ public sealed class PdfFontResolver : IFontResolver
     private static FontCandidate? Select(string familyName, bool isBold, bool isItalic)
     {
         var family = Normalize(familyName);
+        // Filenames on Debian/Ubuntu carry no spaces ("LiberationSans-Regular.ttf"),
+        // so strip all separators before comparing families.
+        var familyCompact = Compact(family);
         var alias = family is "arial" or "helvetica" ? "liberation sans" : family;
 
         var candidates = GetCandidates();
-        var bucket = candidates.Where(c => Normalize(c.Family) == alias || Normalize(c.Family) == family).ToList();
-
-        if (bucket.Count == 0 && alias != family)
-            bucket = candidates.Where(c => Normalize(c.Family) == family).ToList();
+        var bucket = candidates
+            .Where(c => Compact(Normalize(c.Family)) == familyCompact ||
+                        (alias != family && Compact(Normalize(c.Family)) == Compact(alias)))
+            .ToList();
 
         if (bucket.Count == 0)
         {
             // Last resort: any sans-serif as a readable fallback
-            bucket = candidates.Where(c => Normalize(c.Family) is "liberation sans" or "dejavu sans").ToList();
+            bucket = candidates.Where(c => Compact(Normalize(c.Family)) is "liberationsans" or "dejavusans").ToList();
+        }
+
+        if (bucket.Count == 0)
+        {
+            // Absolute last resort: first font we can find (Windows dev box
+            // usually has neither Liberation nor DejaVu, e.g. arialbd.ttf).
+            bucket = candidates.Take(1).ToList();
         }
 
         var exact = bucket.FirstOrDefault(c => c.Bold == isBold && c.Italic == isItalic);
@@ -67,7 +77,7 @@ public sealed class PdfFontResolver : IFontResolver
         if (boldOk != null)
             return boldOk;
 
-        return bucket.FirstOrDefault() ?? bucket.FirstOrDefault();
+        return bucket.FirstOrDefault();
     }
 
     private static List<FontCandidate> GetCandidates()
@@ -131,6 +141,15 @@ public sealed class PdfFontResolver : IFontResolver
     private static (string Family, bool Bold, bool Italic) ParseFileName(string name)
     {
         var lower = name.ToLowerInvariant();
+
+        // Windows ships Arial as arial.ttf / arialbd.ttf / ariali.ttf / arialbi.ttf
+        if (lower.StartsWith("arial"))
+        {
+            var arialBold = lower.Contains("bd") || lower.Contains("bi");
+            var arialItalic = lower.EndsWith("i") && !lower.EndsWith("bd");
+            return ("Arial", arialBold, arialItalic);
+        }
+
         var bold = lower.Contains("bold") || lower.Contains("semibold") || lower.Contains("heavy");
         var italic = lower.Contains("italic") || lower.Contains("oblique");
 
@@ -144,4 +163,7 @@ public sealed class PdfFontResolver : IFontResolver
 
     private static string Normalize(string family)
         => family.Trim().ToLowerInvariant();
+
+    private static string Compact(string family)
+        => family.Replace(" ", string.Empty).Replace("-", string.Empty).Replace("_", string.Empty);
 }
