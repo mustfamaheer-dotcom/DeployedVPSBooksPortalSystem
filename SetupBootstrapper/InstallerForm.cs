@@ -300,7 +300,7 @@ public class InstallerForm : Form
         // Note about existing installation
         var note = new Label
         {
-            Text = "Tip: Running this installer again will replace existing files and update\nthe scheduled task without losing your configuration.",
+            Text = "Tip: Running this installer again updates the agent and keeps your\ncurrent server settings (the API key / server address are preserved).",
             Location = new Point(0, y + 8),
             Size = new Size(cw, 32),
             ForeColor = ClrDim,
@@ -510,7 +510,18 @@ public class InstallerForm : Form
             File.Copy(Path.Combine(tmpDir, "SumatraPDF-3.6.1-64.exe"), Path.Combine(installDir, "SumatraPDF-3.6.1-64.exe"), true);
 
             await SetProgress(70, "Writing configuration...");
-            File.Copy(Path.Combine(tmpDir, "appsettings.json"), Path.Combine(installDir, "appsettings.json"), true);
+            // Preserve the machine's existing settings (server URL / API key) when updating.
+            var existingConfig = Path.Combine(installDir, "appsettings.json");
+            var configBackup = Path.Combine(installDir, "appsettings.json.setupbak");
+            bool hadConfig = File.Exists(existingConfig);
+            if (hadConfig) File.Copy(existingConfig, configBackup, true);
+
+            File.Copy(Path.Combine(tmpDir, "appsettings.json"), existingConfig, true);
+            if (hadConfig)
+            {
+                File.Copy(configBackup, existingConfig, true);
+                SafeDelete(configBackup);
+            }
             File.Copy(Path.Combine(tmpDir, "book.ico"), Path.Combine(installDir, "book.ico"), true);
 
             await SetProgress(78, "Creating scheduled task...");
@@ -643,7 +654,7 @@ reg delete 'HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\DR Bahig Bo
         {
             using var key = Registry.LocalMachine.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\DR Bahig Books Portal");
             key.SetValue("DisplayName", APP_NAME + " Print Agent");
-            key.SetValue("DisplayVersion", "1.1.0");
+            key.SetValue("DisplayVersion", "2.0.0");
             key.SetValue("Publisher", "DR Bahig Books");
             key.SetValue("InstallDate", DateTime.Now.ToString("yyyyMMdd"));
             key.SetValue("DisplayIcon", Path.Combine(installDir, "book.ico"));
