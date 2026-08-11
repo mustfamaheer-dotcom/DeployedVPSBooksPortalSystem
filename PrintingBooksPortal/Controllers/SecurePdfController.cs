@@ -125,10 +125,14 @@ public class SecurePdfController : ControllerBase
 
         _logger.LogInformation("User {UserId} viewing secure PDF for book {BookId}", user.Id, bookId);
 
+        var viewFilePath = _fileStorage.GetFilePath(book.FilePath);
+        if (!System.IO.File.Exists(viewFilePath))
+            return NotFound(new { error = "The book file is missing on the server. Please contact the administrator to re-upload it." });
+
         try
         {
             var tenant = await GetTenantNameAsync();
-            var originalBytes = await System.IO.File.ReadAllBytesAsync(_fileStorage.GetFilePath(book.FilePath));
+            var originalBytes = await System.IO.File.ReadAllBytesAsync(viewFilePath);
             var watermarkEnabled = await _settingsService.IsWatermarkEnabledAsync();
             var watermarkText = await _settingsService.GetWatermarkTextAsync();
             var watermarked = _watermarkService.ApplyWatermarkWithTenant(originalBytes, tenant, shopName, user.UserName ?? "Unknown", DateTime.UtcNow, watermarkEnabled, watermarkText);

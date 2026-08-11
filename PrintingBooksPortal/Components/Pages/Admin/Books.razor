@@ -45,11 +45,11 @@
             <div class="upload-card-body">
                 <form @onsubmit="StartUpload" @onsubmit:preventDefault="true">
                     <div class="row g-3">
-                        <div class="col-md-5">
+                        <div class="col-md-7">
                             <label class="form-label">Book Title</label>
                             <InputText id="uploadTitle" @bind-Value="uploadModel.Title" class="form-control form-control-modern" placeholder="Enter book title" required />
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-5">
                             <label class="form-label">Educational Board</label>
                             <select id="uploadBoard" class="form-select form-control-modern" @bind="uploadModel.BoardId">
                                 <option value="0">-- Select Board --</option>
@@ -58,10 +58,6 @@
                                     <option value="@board.Id">@board.Name</option>
                                 }
                             </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Page Count</label>
-                            <InputNumber id="uploadPages" @bind-Value="uploadModel.PageCount" class="form-control form-control-modern" />
                         </div>
                     </div>
                     <div class="mb-3 mt-3">
@@ -73,6 +69,7 @@
                                 <span id="uploadFileName">Click to select a PDF file or drag & drop</span>
                             </label>
                         </div>
+                        <div class="form-hint">The page count is detected automatically from the PDF.</div>
                     </div>
                     <div class="upload-progress" id="uploadProgressWrap" style="display:none;">
                         <div class="upload-progress-bar">
@@ -124,7 +121,7 @@
                     <InputText id="editTitle" @bind-Value="editModel.Title" class="form-control form-control-modern" placeholder="Enter book title" required />
                 </div>
                 <div class="row g-3 mb-3">
-                    <div class="col-md-6">
+                    <div class="col-md-8">
                         <label class="form-label">Educational Board</label>
                         <select id="editBoard" class="form-select form-control-modern" @bind="editModel.BoardId">
                             <option value="0">-- Select Board --</option>
@@ -134,11 +131,7 @@
                             }
                         </select>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Page Count</label>
-                        <InputNumber id="editPages" @bind-Value="editModel.PageCount" class="form-control form-control-modern" />
-                    </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <label class="form-label">Active</label>
                         <div class="form-check mt-2">
                             <input id="editIsActive" type="checkbox" class="form-check-input" @bind="editModel.IsActive" />
@@ -155,6 +148,7 @@
                             <span id="editFileName">Click to select a new PDF file (optional)</span>
                         </label>
                     </div>
+                    <div class="form-hint">When replacing the PDF, the page count is detected automatically.</div>
                 </div>
                 <div class="upload-progress" id="editProgressWrap" style="display:none;">
                     <div class="upload-progress-bar">

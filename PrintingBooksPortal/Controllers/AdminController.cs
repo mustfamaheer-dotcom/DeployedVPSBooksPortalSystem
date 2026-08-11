@@ -79,6 +79,14 @@ public class AdminController : ControllerBase
             book.FilePath = newFile;
             book.OriginalFileName = file.FileName;
             book.FileSizeBytes = file.Length;
+
+            // Page count is detected automatically from the PDF (iText7 handles
+            // xref-stream PDFs). Falls back to the submitted value only when the
+            // PDF cannot be parsed.
+            var detectedPages = PdfPageCounter.Count(_fileStorage.GetFilePath(newFile));
+            if (detectedPages > 0)
+                book.PageCount = detectedPages;
+
             await _db.SaveChangesAsync();
             // Remove the replaced version only after the new one is committed.
             if (!string.IsNullOrEmpty(oldFile))
@@ -206,4 +214,22 @@ public class BookUploadRequest
     public int BoardId { get; set; }
     public int PageCount { get; set; }
     public bool IsActive { get; set; } = true;
+}
+
+public static class PdfPageCounter
+{
+    /// <summary>Counts the pages of a PDF on disk. Returns 0 when the file cannot be parsed.</summary>
+    public static int Count(string filePath)
+    {
+        try
+        {
+            using var reader = new iText.Kernel.Pdf.PdfReader(filePath);
+            using var pdf = new iText.Kernel.Pdf.PdfDocument(reader);
+            return pdf.GetNumberOfPages();
+        }
+        catch
+        {
+            return 0;
+        }
+    }
 }

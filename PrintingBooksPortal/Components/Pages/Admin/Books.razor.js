@@ -70,7 +70,6 @@ export function uploadNewBook() {
     fd.append('BookId', '0');
     fd.append('Title', document.getElementById('uploadTitle')?.value ?? '');
     fd.append('BoardId', document.getElementById('uploadBoard')?.value ?? '0');
-    fd.append('PageCount', document.getElementById('uploadPages')?.value ?? '0');
     fd.append('IsActive', 'true');
     fd.append('file', file);
 
@@ -82,7 +81,6 @@ export function updateBook(bookId) {
     fd.append('BookId', String(bookId));
     fd.append('Title', document.getElementById('editTitle')?.value ?? '');
     fd.append('BoardId', document.getElementById('editBoard')?.value ?? '0');
-    fd.append('PageCount', document.getElementById('editPages')?.value ?? '0');
     fd.append('IsActive', document.getElementById('editIsActive')?.checked ? 'true' : 'false');
 
     const file = document.getElementById('editPdfUpload')?.files?.[0];

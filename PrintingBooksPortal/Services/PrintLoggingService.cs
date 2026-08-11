@@ -70,6 +70,29 @@ public class PrintLoggingService
             .ToDictionaryAsync(x => x.Shop, x => x.Total);
     }
 
+    public async Task<List<ShopPrintStat>> GetShopPrintStatsAsync()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.PrintLogs
+            .GroupBy(l => new { l.ShopId, l.ShopName })
+            .Select(g => new ShopPrintStat
+            {
+                ShopId = g.Key.ShopId,
+                ShopName = g.Key.ShopName,
+                Total = g.Sum(l => l.Copies)
+            })
+            .OrderByDescending(s => s.Total)
+            .ToListAsync();
+    }
+
+    public record ShopPrintStat
+    {
+        public int ShopId { get; init; }
+        public string ShopName { get; init; } = "";
+        public int Total { get; init; }
+    }
+
     public async Task<Dictionary<string, int>> GetPrintsPerBookAsync()
     {
         using var scope = _scopeFactory.CreateScope();
