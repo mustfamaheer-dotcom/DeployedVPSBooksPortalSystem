@@ -99,6 +99,9 @@ _ = Task.Run(async () =>
     if (!string.IsNullOrEmpty(apiKey))
         client.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
     var printService = app.Services.GetRequiredService<PdfPrintService>();
+    // JobIds rejected because the requested printer is not installed on this machine —
+    // skipped for 6 minutes to avoid claiming + releasing them every 3 seconds.
+    var printerGuard = new Dictionary<string, DateTime>();
 
     while (true)
     {
@@ -112,8 +115,11 @@ _ = Task.Run(async () =>
                 if (result?.Jobs != null)
                 {
                     foreach (var jobId in result.Jobs)
-                    {
-                        Log($"Found pending job: {jobId}");
+                {
+                    if (printerGuard.TryGetValue(jobId, out var skipUntil) && DateTime.UtcNow < skipUntil)
+                        continue;
+
+                    Log($"Found pending job: {jobId}");
 
                         var claimResponse = await client.PostAsync($"{baseUrl}/api/pdf/print-agent/claim/{jobId}", null);
                         if (!claimResponse.IsSuccessStatusCode)
@@ -128,6 +134,18 @@ _ = Task.Run(async () =>
                         var copies = claimResult?.Copies ?? 1;
                         var jobPrinter = claimResult?.PrinterName;
                         var effectivePrinter = !string.IsNullOrWhiteSpace(jobPrinter) ? jobPrinter : defaultPrinter;
+
+                        // Accuracy guard: never print to a different printer than requested.
+                        // If the claimed printer is not installed on this machine, leave the
+                        // job in the queue (bypass it for a while) so it is not silently
+                        // printed on the wrong printer or retried every 3 seconds.
+                        if (!string.IsNullOrWhiteSpace(effectivePrinter) && !PrinterGuard.IsInstalled(effectivePrinter))
+                        {
+                            Log($"Job {jobId}: requested printer '{effectivePrinter}' is not installed on this machine — leaving job in queue.");
+                            printerGuard[jobId] = DateTime.UtcNow.AddMinutes(6);
+                            try { await client.PostAsync($"{baseUrl}/api/pdf/print-agent/release/{jobId}", null); } catch { }
+                            continue;
+                        }
 
                         var settings = new PrintSettings
                         {
@@ -214,4 +232,25 @@ public class ClaimResponse
     public double? MarginBottom { get; set; }
     public double? MarginLeft { get; set; }
     public double? MarginRight { get; set; }
+}
+
+public static class PrinterGuard
+{
+    public static bool IsInstalled(string printerName)
+    {
+        try
+        {
+            foreach (string installed in System.Drawing.Printing.PrinterSettings.InstalledPrinters)
+            {
+                if (string.Equals(installed, printerName, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+        catch
+        {
+            // If enumeration fails, allow the attempt — SumatraPDF will surface the error.
+            return true;
+        }
+        return false;
+    }
 }

@@ -177,6 +177,17 @@ public class SecurePdfController : ControllerBase
         var shopName = shop?.Name ?? "Unknown Shop";
         var copies = Math.Max(1, request.Copies);
 
+        // Accuracy gate: never queue a job for a printer the agent does not currently
+        // detect — otherwise the job would silently fail or fall back to the wrong printer.
+        // Skipped when the agent has not reported a printer list yet (cannot validate).
+        var printerCheck = AgentStatusTracker.HasPrinter(request.PrinterName);
+        if (printerCheck == false)
+            return BadRequest(new
+            {
+                success = false,
+                error = $"The selected printer \"{request.PrinterName}\" is not currently detected by the agent on this computer. Refresh the printer list and try again."
+            });
+
         var jobId = Guid.NewGuid().ToString("N");
         var userPass = $"PRINT-{jobId}";
         // Security: read OwnerPassword from config or env var; fail if unset in production
@@ -615,6 +626,12 @@ public static class PendingPrintJobs
 
 public static class AgentStatusTracker
 {
+    // The agent heartbeats every 3s. Treat <30s as fully connected,
+    // 30–60s as stale (agent reachable moments ago, keep last known printers),
+    // and >60s as offline.
+    private const double OfflineAfterSeconds = 60;
+    private const double StaleAfterSeconds = 30;
+
     private static DateTime _lastSeen = DateTime.MinValue;
     private static List<AgentPrinterInfo> _printers = new();
     private static int _tenantId;
@@ -630,19 +647,41 @@ public static class AgentStatusTracker
         }
     }
 
-    public static bool IsConnected => (DateTime.UtcNow - _lastSeen).TotalSeconds < 15;
+    public static bool IsConnected => (DateTime.UtcNow - _lastSeen).TotalSeconds < OfflineAfterSeconds;
 
     public static object GetStatus()
     {
         lock (_lock)
         {
+            var ageSeconds = _lastSeen == DateTime.MinValue ? double.MaxValue : (DateTime.UtcNow - _lastSeen).TotalSeconds;
             return new
             {
-                connected = IsConnected,
+                connected = ageSeconds < OfflineAfterSeconds,
+                stale = ageSeconds >= StaleAfterSeconds && ageSeconds < OfflineAfterSeconds,
                 lastSeen = _lastSeen == DateTime.MinValue ? (string?)null : _lastSeen.ToString("O"),
                 tenantId = _tenantId,
                 printers = _printers
             };
+        }
+    }
+
+    /// <summary>
+    /// Accuracy gate: checks a requested printer name against the agent's last known list.
+    /// Returns true for empty names (agent prints to default), false when the name is
+    /// NOT known to the agent, and null when the agent has never reported printers
+    /// (nothing to validate against, e.g. right after a server restart).
+    /// </summary>
+    public static bool? HasPrinter(string? printerName)
+    {
+        if (string.IsNullOrWhiteSpace(printerName))
+            return true;
+
+        lock (_lock)
+        {
+            if (_printers.Count == 0)
+                return null;
+            return _printers.Any(p =>
+                string.Equals(p.Name?.Trim(), printerName.Trim(), StringComparison.OrdinalIgnoreCase));
         }
     }
 }
@@ -652,6 +691,8 @@ public class AgentPrinterInfo
     public string Name { get; set; } = "";
     public string? ConnectionType { get; set; }
     public bool IsDefault { get; set; }
+    public bool IsOnline { get; set; } = true;
+    public string? Status { get; set; }
 }
 
 public class AgentHeartbeatRequest

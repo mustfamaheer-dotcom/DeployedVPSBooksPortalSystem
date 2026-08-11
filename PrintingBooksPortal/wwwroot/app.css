@@ -1257,8 +1257,10 @@ a:hover { color: var(--primary-dark); }
     flex-shrink: 0;
 }
 .printer-status-online { background: #10b981; box-shadow: 0 0 6px rgba(16,185,129,0.5); }
+.printer-status-stale { background: #f59e0b; box-shadow: 0 0 6px rgba(245,158,11,0.5); }
 .printer-status-offline { background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,0.5); }
 .printer-status-text.online { color: rgba(16,185,129,0.8); }
+.printer-status-text.stale { color: rgba(245,158,11,0.9); }
 .printer-status-text.offline { color: rgba(239,68,68,0.8); }
 
 /* ─── Page Setup ─── */

@@ -327,7 +327,16 @@
                 });
             });
         }
+
+        var select = document.getElementById('printerSelect');
+        if (select) {
+            select.addEventListener('change', function () {
+                settings.printerName = this.value;
+            });
+        }
     }
+
+    var lastKnownPrinters = [];
 
     function detectPrinters(callback) {
         callback = callback || function () { };
@@ -337,7 +346,12 @@
         if (!select) { callback(); return; }
 
         function setOffline(msg) {
-            select.innerHTML = '<option value="">Select a printer…</option>';
+            var hasKnown = lastKnownPrinters.length > 0;
+            // Keep the last known printer list visible when the agent simply went
+            // away for a moment — clearing it is what made printers "disappear".
+            if (!hasKnown) {
+                select.innerHTML = '<option value="">Select a printer…</option>';
+            }
             if (statusDot) statusDot.className = 'printer-status-dot printer-status-offline';
             if (statusText) {
                 statusText.textContent = msg || 'Agent not running';
@@ -346,45 +360,75 @@
             callback();
         }
 
-        var baseUrl = 'http://localhost:8080';
-        var altUrl = 'http://127.0.0.1:8080';
-        var healthUrl = baseUrl + '/api/print-job/health';
-
-        function tryFetch(url) {
-            return fetch(url, { mode: 'cors', cache: 'no-cache' }).then(function (r) {
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                return r.json();
-            });
+        function timeAgo(iso) {
+            if (!iso) return 'unknown time';
+            var then = new Date(iso).getTime();
+            if (isNaN(then)) return 'unknown time';
+            var secs = Math.floor((Date.now() - then) / 1000);
+            if (secs < 5) return 'just now';
+            if (secs < 60) return secs + 's ago';
+            return Math.floor(secs / 60) + 'm ' + (secs % 60) + 's ago';
         }
 
-        function onPrintersFetched(data) {
+        function onPrintersFetched(printers, connected, stale, lastSeen) {
+            lastKnownPrinters = printers;
+            var previous = select.value;
+            var previousExisted = false;
+            var defaultSet = false;
+
             select.innerHTML = '<option value="">Select a printer…</option>';
-            var isDefaultSet = false;
-            if (data.printers && data.printers.length > 0) {
-                data.printers.forEach(function (p) {
-                    var opt = document.createElement('option');
-                    opt.value = p.name;
-                    var badge = '';
-                    switch ((p.connectionType || '').toLowerCase()) {
-                        case 'network': badge = '\uD83C\uDF10'; break;
-                        case 'usb': badge = '\uD83D\uDD0C'; break;
-                        case 'bluetooth': badge = '\uD83D\uDCF6'; break;
-                        case 'wifi': badge = '\uD83D\uDCE1'; break;
-                        default: badge = '\uD83D\uDDA8\uFE0F'; break;
-                    }
-                    opt.textContent = p.name + '  ' + badge + ' ' + (p.connectionType || 'Local');
-                    if (p.isDefault && !isDefaultSet) {
-                        opt.selected = true;
-                        settings.printerName = p.name;
-                        isDefaultSet = true;
-                    }
-                    select.appendChild(opt);
-                });
+
+            printers.forEach(function (p) {
+                if (!p.name) return;
+                var isOnline = p.isOnline !== false;
+                var matchesPrevious = previous && p.name.trim().toLowerCase() === previous.trim().toLowerCase();
+                if (matchesPrevious) previousExisted = true;
+
+                var opt = document.createElement('option');
+                opt.value = p.name;
+                var badge = '';
+                switch ((p.connectionType || '').toLowerCase()) {
+                    case 'network': badge = '\uD83C\uDF10'; break;
+                    case 'usb': badge = '\uD83D\uDD0C'; break;
+                    case 'bluetooth': badge = '\uD83D\uDCF6'; break;
+                    case 'wifi': badge = '\uD83D\uDCE1'; break;
+                    default: badge = '\uD83D\uDDA8\uFE0F'; break;
+                }
+                opt.textContent = p.name + '  ' + badge + ' ' + (p.connectionType || 'Local') + (isOnline ? '' : '  (offline)');
+                if (!isOnline) opt.disabled = true; // cannot select an offline printer
+                select.appendChild(opt);
+
+                // Restore the user's previous selection if it still exists;
+                // otherwise (no choice yet, or it vanished) auto-select the agent's default.
+                var shouldDefault = (!previous || !previousExisted) && p.isDefault && isOnline && !defaultSet;
+                if (matchesPrevious) {
+                    opt.selected = true;
+                    settings.printerName = p.name;
+                } else if (shouldDefault) {
+                    opt.selected = true;
+                    settings.printerName = p.name;
+                    defaultSet = true;
+                }
+            });
+
+            if (statusDot) {
+                statusDot.className = connected
+                    ? 'printer-status-dot printer-status-online'
+                    : 'printer-status-dot printer-status-stale';
             }
-            if (statusDot) statusDot.className = 'printer-status-dot printer-status-online';
             if (statusText) {
-                statusText.textContent = 'Online \u2014 ' + data.printers.length + ' printer' + (data.printers.length !== 1 ? 's' : '') + ' found';
-                statusText.className = 'printer-status-text online';
+                var n = printers.length;
+                var countText = n + ' printer' + (n !== 1 ? 's' : '');
+                if (connected) {
+                    statusText.textContent = 'Online \u2014 ' + countText + ' found';
+                    statusText.className = 'printer-status-text online';
+                } else if (stale) {
+                    statusText.textContent = 'Agent stale \u2014 last seen ' + timeAgo(lastSeen) + ' (showing last known printer list)';
+                    statusText.className = 'printer-status-text stale';
+                } else {
+                    statusText.textContent = 'Agent offline \u2014 last seen ' + timeAgo(lastSeen) + ' (showing last known printer list)';
+                    statusText.className = 'printer-status-text offline';
+                }
             }
             callback();
         }
@@ -394,23 +438,29 @@
             if (!r.ok) throw new Error();
             return r.json();
         }).then(function (data) {
-            if (data.connected && data.printers && data.printers.length > 0) {
-                onPrintersFetched({ printers: data.printers });
-            } else if (data.connected) {
-                setOffline('Agent detected — printers endpoint missing (old version)');
-            } else {
-                setOffline('Agent not running — double-click the desktop shortcut');
-            }
-        }).catch(function () {
-            setOffline('Agent not running — double-click the desktop shortcut');
-        });
+            var printers = data.printers || [];
+            var connected = !!data.connected;
+            var stale = !!data.stale;
 
-        var printerSelect = document.getElementById('printerSelect');
-        if (printerSelect) {
-            printerSelect.addEventListener('change', function () {
-                settings.printerName = this.value;
-            });
-        }
+            if (printers.length === 0) {
+                if (connected) {
+                    setOffline('Agent detected \u2014 printers endpoint missing (old version)');
+                } else if (lastKnownPrinters.length > 0) {
+                    onPrintersFetched(lastKnownPrinters, false, false, data.lastSeen);
+                } else {
+                    setOffline('Agent not running \u2014 double-click the desktop shortcut');
+                }
+                return;
+            }
+
+            onPrintersFetched(printers, connected, stale, data.lastSeen);
+        }).catch(function () {
+            if (lastKnownPrinters.length > 0) {
+                onPrintersFetched(lastKnownPrinters, false, false, null);
+            } else {
+                setOffline('Agent not running \u2014 double-click the desktop shortcut');
+            }
+        });
     }
 
     // ══════════════════════════════════════
