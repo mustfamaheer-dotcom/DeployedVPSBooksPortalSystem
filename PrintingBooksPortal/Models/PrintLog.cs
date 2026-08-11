@@ -17,6 +17,10 @@ public class PrintLog
 
     public int Copies { get; set; } = 1;
 
+    /// <summary>Selected pages, canonical form: "All" or e.g. "1-5, 8, 11-13".</summary>
+    [MaxLength(200)]
+    public string? Pages { get; set; }
+
     [MaxLength(100)]
     public string? PrintedByUserId { get; set; }
 

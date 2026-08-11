@@ -45,6 +45,7 @@
                             <tr>
                                 <th>Date/Time</th>
                                 <th>Book</th>
+                                <th>Pages</th>
                                 <th>Copies</th>
                                 <th>Printed By</th>
                                 <th>IP</th>
@@ -56,6 +57,7 @@
                                 <tr>
                                     <td class="text-muted">@log.PrintedAt.ToEgyptLocal().ToString("g")</td>
                                     <td><strong>@log.BookTitle</strong></td>
+                                    <td><span class="pages-badge">@(log.Pages ?? "All")</span></td>
                                     <td><span class="count-badge">@log.Copies</span></td>
                                     <td>@log.PrintedByUserName</td>
                                     <td><code class="ip-badge">@log.IPAddress</code></td>

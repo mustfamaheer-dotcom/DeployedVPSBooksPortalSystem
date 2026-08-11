@@ -295,6 +295,7 @@
                                 <th>Date/Time</th>
                                 <th>Shop</th>
                                 <th>Book</th>
+                                <th>Pages</th>
                                 <th>Copies</th>
                                 <th>User</th>
                                 <th>IP</th>
@@ -307,6 +308,7 @@
                                     <td class="text-muted">@log.PrintedAt.ToEgyptLocal().ToString("g")</td>
                                     <td><span class="shop-tag">@log.ShopName</span></td>
                                     <td>@log.BookTitle</td>
+                                    <td><span class="pages-badge">@(log.Pages ?? "All")</span></td>
                                     <td><strong>@log.Copies</strong></td>
                                     <td>@log.PrintedByUserName</td>
                                     <td><code class="ip-badge">@log.IPAddress</code></td>

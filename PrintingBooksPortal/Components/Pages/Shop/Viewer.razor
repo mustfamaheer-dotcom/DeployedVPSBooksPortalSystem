@@ -121,6 +121,26 @@ else
 
                             <div class="settings-divider"></div>
 
+                            @* ─── Pages Section ─── *@
+                            <div class="settings-section">
+                                <div class="settings-label">Pages</div>
+                                <div class="scaling-options" id="pageRangeOptions">
+                                    <label class="scaling-radio">
+                                        <input type="radio" name="pageRange" value="all" checked />
+                                        <span>All pages</span>
+                                    </label>
+                                    <label class="scaling-radio">
+                                        <input type="radio" name="pageRange" value="custom" />
+                                        <span>Custom pages</span>
+                                    </label>
+                                </div>
+                                <input type="text" class="page-range-input" id="pageRangeInput" placeholder="e.g. 1-5, 8, 11-13" disabled />
+                                <div class="page-range-error" id="pageRangeError"></div>
+                                <div class="pages-summary" id="pagesSummary"></div>
+                            </div>
+
+                            <div class="settings-divider"></div>
+
                             @* ─── Print Mode Section ─── *@
                             <div class="settings-section">
                                 <div class="settings-label">Print Mode</div>

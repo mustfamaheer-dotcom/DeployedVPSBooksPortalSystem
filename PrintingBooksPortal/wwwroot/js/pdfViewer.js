@@ -106,6 +106,9 @@
         // ─── Duplex ───
         wireDuplexControls();
 
+        // ─── Pages ───
+        wirePagesControls();
+
         // ─── Scaling ───
         wireScalingControls();
 
@@ -170,6 +173,143 @@
                 settings.duplex = this.value;
             });
         });
+    }
+
+    // ══════════════════════════════════════
+    //  PAGES CONTROLS
+    // ══════════════════════════════════════
+
+    var pageTotal = 0;
+
+    function wirePagesControls() {
+        var input = document.getElementById('pageRangeInput');
+        if (!input) return;
+
+        document.querySelectorAll('input[name="pageRange"]').forEach(function (radio) {
+            radio.addEventListener('change', function () {
+                input.disabled = radio.value !== 'custom';
+                if (radio.value === 'all') input.value = '';
+                getPagesSelection();
+            });
+        });
+
+        input.addEventListener('input', function () {
+            getPagesSelection();
+        });
+
+        input.addEventListener('keydown', function (e) {
+            e.stopPropagation();
+        });
+
+        getPagesSelection();
+    }
+
+    function setPageTotal(total) {
+        pageTotal = total;
+        getPagesSelection();
+    }
+
+    function setPagesError(message) {
+        var errorEl = document.getElementById('pageRangeError');
+        var input = document.getElementById('pageRangeInput');
+        var summaryEl = document.getElementById('pagesSummary');
+        if (errorEl) errorEl.textContent = message;
+        if (input) input.classList.add('invalid');
+        if (summaryEl) summaryEl.textContent = '';
+    }
+
+    function clearPagesError() {
+        var errorEl = document.getElementById('pageRangeError');
+        var input = document.getElementById('pageRangeInput');
+        if (errorEl) errorEl.textContent = '';
+        if (input) input.classList.remove('invalid');
+    }
+
+    function parsePageSelection(raw, total) {
+        var tokens = raw.split(',');
+        var seen = {};
+
+        for (var i = 0; i < tokens.length; i++) {
+            var t = tokens[i].trim();
+            if (!/^\d+(-\d+)?$/.test(t)) {
+                return { valid: false, error: "Invalid page selection: '" + t + "'. Use numbers and ranges, e.g. 1-5, 8, 11-13." };
+            }
+            var parts = t.split('-');
+            var s = parseInt(parts[0], 10);
+            var e = parts.length === 2 ? parseInt(parts[1], 10) : s;
+            if (!(s >= 1 && e >= 1)) {
+                return { valid: false, error: 'Page numbers must be 1 or greater.' };
+            }
+            if (s > e) {
+                return { valid: false, error: "Invalid range '" + t + "': start must not be greater than end." };
+            }
+            if (total > 0 && e > total) {
+                return { valid: false, error: 'Page ' + e + ' is out of range: this book has ' + total + ' pages.' };
+            }
+            for (var n = s; n <= e; n++) seen[n] = true;
+        }
+
+        var sorted = Object.keys(seen).map(Number).sort(function (a, b) { return a - b; });
+        if (sorted.length === 0) {
+            return { valid: false, error: 'Please enter at least one page to print.' };
+        }
+
+        var canonical = [];
+        var count = 0;
+        var rs = sorted[0];
+        var re = sorted[0];
+        for (var k = 1; k < sorted.length; k++) {
+            if (sorted[k] === re + 1) {
+                re = sorted[k];
+                continue;
+            }
+            canonical.push(rs === re ? String(rs) : rs + '-' + re);
+            count += re - rs + 1;
+            rs = sorted[k];
+            re = sorted[k];
+        }
+        canonical.push(rs === re ? String(rs) : rs + '-' + re);
+        count += re - rs + 1;
+
+        return { valid: true, canonical: canonical.join(', '), count: count };
+    }
+
+    // Returns { valid, value } — value is '' for "All pages" (server default),
+    // otherwise the raw selection string as typed (server re-parses and canonicalizes).
+    function getPagesSelection() {
+        var radio = document.querySelector('input[name="pageRange"]:checked');
+        var input = document.getElementById('pageRangeInput');
+        var summaryEl = document.getElementById('pagesSummary');
+        if (!radio || !input) return { valid: true, value: '' };
+
+        if (radio.value !== 'custom') {
+            clearPagesError();
+            if (summaryEl) {
+                summaryEl.textContent = pageTotal > 0 ? 'Printing all ' + pageTotal + ' pages.' : '';
+            }
+            return { valid: true, value: '' };
+        }
+
+        var raw = (input.value || '').trim();
+        if (!raw) {
+            var emptyError = 'Enter the pages to print, e.g. 1-5, 8.';
+            setPagesError(emptyError);
+            return { valid: false, value: raw, error: emptyError };
+        }
+
+        var parsed = parsePageSelection(raw, pageTotal);
+        if (!parsed.valid) {
+            setPagesError(parsed.error);
+            return { valid: false, value: raw, error: parsed.error };
+        }
+
+        clearPagesError();
+        if (summaryEl) {
+            summaryEl.textContent = pageTotal > 0
+                ? 'Printing ' + parsed.count + ' of ' + pageTotal + ' pages (' + parsed.canonical + ').'
+                : 'Printing ' + parsed.count + ' pages (' + parsed.canonical + ').';
+        }
+        return { valid: true, value: raw };
     }
 
     // ══════════════════════════════════════
@@ -493,6 +633,7 @@
             };
 
             pdfDoc = await loadingTask.promise;
+            setPageTotal(pdfDoc.numPages);
 
             loadingEl.style.display = 'none';
             container.innerHTML = '';
@@ -675,6 +816,10 @@
         if (printBtn) printBtn.disabled = true;
 
         try {
+            if (!pdfDoc) {
+                throw new Error('The document is still loading. Please wait a moment and try again.');
+            }
+
             var copiesInput = document.getElementById('copiesInput');
             var copies = copiesInput ? parseInt(copiesInput.value, 10) || 1 : 1;
 
@@ -699,9 +844,15 @@
             var marginRight = parseFloat(document.getElementById('marginRight').value) || settings.marginRight;
             var marginUnit = document.getElementById('marginUnitSelect') ? document.getElementById('marginUnitSelect').value : settings.marginUnit;
 
+            var pageSelection = getPagesSelection();
+            if (!pageSelection.valid) {
+                throw new Error(pageSelection.error || 'Invalid page selection.');
+            }
+
             var payload = {
                 bookId: bookId,
                 copies: copies,
+                pages: pageSelection.value || undefined,
                 printerName: printerName || undefined,
                 paperSize: paperSize,
                 duplex: duplex,

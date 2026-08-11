@@ -193,9 +193,21 @@ public class SecurePdfController : ControllerBase
         {
             var tenantName = await GetTenantNameAsync();
             var originalBytes = await System.IO.File.ReadAllBytesAsync(filePath);
+
+            // Page selection: validate against the REAL PDF page count (never trust DB PageCount).
+            // Fail closed: any invalid selection is rejected before anything is queued.
+            var totalPages = PdfPageSelection.CountPages(originalBytes);
+            if (!PdfPageSelection.TryParse(request.Pages, totalPages, out var selectedPages, out var pageError))
+                return BadRequest(new { success = false, error = pageError });
+
+            var pageSummary = PdfPageSelection.FormatPages(selectedPages);
+            var printSource = selectedPages.Count > 0
+                ? PdfPageSelection.ExtractPages(originalBytes, selectedPages)
+                : originalBytes;
+
             var watermarkEnabled = await _settingsService.IsWatermarkEnabledAsync();
             var watermarkText = await _settingsService.GetWatermarkTextAsync();
-            var watermarked = _watermarkService.ApplyWatermarkWithTenant(originalBytes, tenantName, shopName, user.UserName ?? "Unknown", DateTime.UtcNow, watermarkEnabled, watermarkText);
+            var watermarked = _watermarkService.ApplyWatermarkWithTenant(printSource, tenantName, shopName, user.UserName ?? "Unknown", DateTime.UtcNow, watermarkEnabled, watermarkText);
             var securedBytes = _pdfSecurity.EncryptPdfWithPassword(watermarked, userPass, ownerPass);
 
             var secureDir = SecurePrintsPath.GetSecureDir(tenantId);
@@ -204,10 +216,10 @@ public class SecurePdfController : ControllerBase
             await System.IO.File.WriteAllBytesAsync(securePath, securedBytes);
 
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
-            await _printLogging.LogPrintAsync(tenantId, user.ShopId.Value, request.BookId, copies, user.Id, user.UserName);
+            await _printLogging.LogPrintAsync(tenantId, user.ShopId.Value, request.BookId, copies, user.Id, user.UserName, pageSummary);
 
-            _logger.LogInformation("Print logged: Job={JobId}, Shop={ShopId}, Book={BookId}, Copies={Copies}, IP={IP}",
-                jobId, user.ShopId, request.BookId, copies, ipAddress);
+            _logger.LogInformation("Print logged: Job={JobId}, Shop={ShopId}, Book={BookId}, Copies={Copies}, Pages={Pages}, IP={IP}",
+                jobId, user.ShopId, request.BookId, copies, pageSummary, ipAddress);
 
             // Track ownership so only the creating shop (or TenantAdmin) can download/print the secured file
             var added = PendingPrintJobs.Jobs.TryAdd(jobId, new PendingJobInfo
@@ -238,6 +250,7 @@ public class SecurePdfController : ControllerBase
                 queueCount = PendingPrintJobs.Jobs.Count,
                 watermarkEnabled,
                 printerName = request.PrinterName,
+                pages = pageSummary,
                 message = $"Print job {jobId} created for {copies} copy(ies).",
                 printEndpoint = $"/api/pdf/print-file/{jobId}",
                 downloadEndpoint = $"/api/pdf/download-secured/{jobId}"
@@ -554,6 +567,9 @@ public class ProcessPrintRequest
 
     [Range(1, 50, ErrorMessage = "Copies must be between 1 and 50.")]
     public int Copies { get; set; } = 1;
+
+    /// <summary>Page selection: null/empty/"all" = every page, otherwise e.g. "1-5, 8, 11-13".</summary>
+    public string? Pages { get; set; }
 
     public string? PrinterName { get; set; }
     public string? PaperSize { get; set; }
