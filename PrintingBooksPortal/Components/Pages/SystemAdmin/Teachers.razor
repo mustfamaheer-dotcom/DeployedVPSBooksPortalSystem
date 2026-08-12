@@ -409,22 +409,24 @@
             if (error != null)
             {
                 createError = error;
-                await JS.InvokeVoidAsync("showToast", error, "error");
+                try { await JS.InvokeVoidAsync("showToast", error, "error"); } catch { /* JS interop unavailable */ }
                 return;
             }
+
             var createdName = newTeacher.Name;
             CloseCreate();
             await Load();
-            await JS.InvokeVoidAsync("showToast", $"Teacher \"{createdName}\" created successfully.", "success");
+            try { await JS.InvokeVoidAsync("showToast", $"Teacher \"{createdName}\" created successfully.", "success"); } catch { /* JS interop unavailable */ }
         }
         catch (Exception ex)
         {
             createError = $"Request failed: {ex.Message}";
-            await JS.InvokeVoidAsync("showToast", createError, "error");
+            try { await JS.InvokeVoidAsync("showToast", createError, "error"); } catch { /* JS interop unavailable */ }
         }
         finally
         {
             busy = false;
+            StateHasChanged();
         }
     }
 
@@ -436,18 +438,18 @@
             if (error != null)
             {
                 errorMessage = error;
-                await JS.InvokeVoidAsync("showToast", error, "error");
+                try { await JS.InvokeVoidAsync("showToast", error, "error"); } catch { }
             }
             else
             {
-                await JS.InvokeVoidAsync("showToast", activate ? "Teacher activated." : "Teacher deactivated.", "success");
+                try { await JS.InvokeVoidAsync("showToast", activate ? "Teacher activated." : "Teacher deactivated.", "success"); } catch { }
             }
             await Load();
         }
         catch (Exception ex)
         {
             errorMessage = $"Action failed: {ex.GetBaseException().Message}";
-            await JS.InvokeVoidAsync("showToast", errorMessage, "error");
+            try { await JS.InvokeVoidAsync("showToast", errorMessage, "error"); } catch { }
         }
     }
 
@@ -463,18 +465,18 @@
             if (!ok)
             {
                 errorMessage = error;
-                await JS.InvokeVoidAsync("showToast", error ?? "Delete failed.", "error");
+                try { await JS.InvokeVoidAsync("showToast", error ?? "Delete failed.", "error"); } catch { }
             }
             else
             {
-                await JS.InvokeVoidAsync("showToast", "Teacher deleted.", "success");
+                try { await JS.InvokeVoidAsync("showToast", "Teacher deleted.", "success"); } catch { }
             }
             await Load();
         }
         catch (Exception ex)
         {
             errorMessage = $"Delete failed: {ex.GetBaseException().Message}";
-            await JS.InvokeVoidAsync("showToast", errorMessage, "error");
+            try { await JS.InvokeVoidAsync("showToast", errorMessage, "error"); } catch { }
         }
         finally
         {
