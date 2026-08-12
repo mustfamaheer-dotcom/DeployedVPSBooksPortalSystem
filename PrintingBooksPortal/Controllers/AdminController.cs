@@ -30,8 +30,6 @@ public class AdminController : ControllerBase
     [HttpPost("books/upload")]
     public async Task<IActionResult> UploadBook([FromForm] BookUploadRequest request, IFormFile? file)
     {
-        const long maxSize = 100L * 1024 * 1024;
-
         if (file == null || file.Length == 0)
         {
             // Metadata-only update is allowed for existing books; new books require a PDF.
@@ -40,8 +38,6 @@ public class AdminController : ControllerBase
         }
         else
         {
-            if (file.Length > maxSize)
-                return BadRequest(new { success = false, error = "File exceeds the 100 MB limit." });
             if (!Path.GetExtension(file.FileName).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
                 return BadRequest(new { success = false, error = "Only PDF files are allowed." });
         }
@@ -143,12 +139,12 @@ public class AdminController : ControllerBase
         if (shop == null)
             return NotFound(new { error = "Shop not found." });
 
-        var logs = await _db.PrintLogs.Where(l => l.ShopId == shopId).ToListAsync();
+        var logs = await _db.PrintLogs
+            .Where(l => l.ShopId == shopId)
+            .Include(l => l.Book)
+            .OrderByDescending(l => l.PrintedAt)
+            .ToListAsync();
         var totalPrints = logs.Sum(l => l.Copies);
-        var perBook = logs.GroupBy(l => l.BookTitle)
-                          .Select(g => new { Book = g.Key, Copies = g.Sum(l => l.Copies) })
-                          .OrderByDescending(x => x.Copies)
-                          .ToList();
 
         using var doc = new PdfDocument();
         var page = doc.AddPage();
@@ -171,7 +167,7 @@ public class AdminController : ControllerBase
 
         gfx.DrawString($"Shop: {shop.Name}", fontBody, black, new XPoint(40, y));
         y += 20;
-        gfx.DrawString($"Date: {DateTime.Now:dd/MM/yyyy HH:mm}", fontBody, gray, new XPoint(40, y));
+        gfx.DrawString($"Date: {DateTime.UtcNow.ToEgyptLocal():dd/MM/yyyy HH:mm}", fontBody, gray, new XPoint(40, y));
         y += 20;
         gfx.DrawString("Phone: " + (shop.Phone ?? "\u2014"), fontBody, gray, new XPoint(40, y));
         y += 20;
@@ -184,16 +180,31 @@ public class AdminController : ControllerBase
         gfx.DrawString($"Total prints: {totalPrints}", fontHeader, black, new XPoint(40, y));
         y += 28;
 
-        if (perBook.Count > 0)
+        if (logs.Count > 0)
         {
-            gfx.DrawString("Prints by book:", fontHeader, black, new XPoint(40, y));
-            y += 24;
+            var rowFont = new XFont("Arial", 8, XFontStyle.Regular);
+            var headerFont = new XFont("Arial", 8, XFontStyle.Bold);
+            gfx.DrawString("Date/Time", headerFont, gray, new XPoint(40, y));
+            gfx.DrawString("Book", headerFont, gray, new XPoint(135, y));
+            gfx.DrawString("Pages", headerFont, gray, new XPoint(300, y));
+            gfx.DrawString("Copies", headerFont, gray, new XPoint(370, y));
+            gfx.DrawString("Printed By", headerFont, gray, new XPoint(415, y));
+            gfx.DrawString("IP", headerFont, gray, new XPoint(500, y));
+            y += 14;
 
-            foreach (var item in perBook)
+            foreach (var log in logs)
             {
-                gfx.DrawString($"\u2022  {item.Book}", fontBody, black, new XPoint(50, y));
-                gfx.DrawString($"{item.Copies} copy(ies)", fontBody, gray, new XPoint(420, y));
-                y += 20;
+                var title = log.BookTitle.Length > 35 ? log.BookTitle[..35] : log.BookTitle;
+                var by = (log.PrintedByUserName ?? "\u2014").Length > 30 ? (log.PrintedByUserName ?? "\u2014")[..30] : (log.PrintedByUserName ?? "\u2014");
+                var ip = (log.IPAddress ?? "\u2014").Length > 24 ? (log.IPAddress ?? "\u2014")[..24] : (log.IPAddress ?? "\u2014");
+
+                gfx.DrawString(log.PrintedAt.ToEgyptLocal().ToString("g"), rowFont, black, new XPoint(40, y));
+                gfx.DrawString(title, rowFont, black, new XPoint(135, y));
+                gfx.DrawString(PdfPageSelection.DescribePages(log.Pages, log.Book?.PageCount), rowFont, black, new XPoint(300, y));
+                gfx.DrawString(log.Copies.ToString(), rowFont, black, new XPoint(370, y));
+                gfx.DrawString(by, rowFont, black, new XPoint(415, y));
+                gfx.DrawString(ip, rowFont, black, new XPoint(500, y));
+                y += 13;
 
                 if (y > 770)
                 {

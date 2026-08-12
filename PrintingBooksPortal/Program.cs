@@ -106,16 +106,15 @@ builder.Services.AddControllers().ConfigureApiBehaviorOptions(options =>
 });
 builder.Services.AddSignalR();
 
-// Uploads: the app-level limit is 100 MB per book PDF; give Kestrel and the
-// multipart parser headroom beyond that so the friendly controller error fires
-// first instead of a bare 413.
+// Uploads: book PDFs can be large (scanned books, no size limit enforced —
+// the upload endpoint validates the file type and stores it as-is).
 builder.WebHost.ConfigureKestrel(options =>
 {
-    options.Limits.MaxRequestBodySize = 1024L * 1024 * 1024;
+    options.Limits.MaxRequestBodySize = long.MaxValue;
 });
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
 {
-    options.MultipartBodyLengthLimit = 1024L * 1024 * 1024;
+    options.MultipartBodyLengthLimit = long.MaxValue;
 });
 builder.Services.AddScoped<ServerAuthenticationMessageHandler>();
 builder.Services.AddScoped(sp =>
