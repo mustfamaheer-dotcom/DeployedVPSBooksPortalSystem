@@ -15,7 +15,10 @@ var builder = WebApplication.CreateBuilder(args);
 // Persist Data Protection keys to disk so antiforgery tokens and auth cookies
 // survive container restarts.  Without this, every restart generates a new key
 // ring and all old cookies become invalid (Blazor circuit auth fails).
-var dataProtectionPath = Path.Combine(AppContext.BaseDirectory, "DataProtection-Keys");
+// Stored under App_Data because that directory is the app's named volume and
+// survives container recreation on redeploy.
+var dataProtectionPath = Path.Combine(AppContext.BaseDirectory, "App_Data", "DataProtection-Keys");
+Directory.CreateDirectory(dataProtectionPath);
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionPath))
     .SetApplicationName("BooksPortal");
@@ -134,6 +137,18 @@ var app = builder.Build();
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost | ForwardedHeaders.XForwardedFor
+});
+
+// Traefik terminates TLS and forwards to this app over plain HTTP on :8080, so
+// Request.Scheme would otherwise be "http" and every server-generated URL
+// (login redirects, ReturnUrl, absolute links) would point at http:// and get
+// blocked as mixed content by browsers.  Force the scheme from the proxy header.
+app.Use(async (context, next) =>
+{
+    var forwardedProto = context.Request.Headers["X-Forwarded-Proto"].ToString();
+    if (!string.IsNullOrEmpty(forwardedProto))
+        context.Request.Scheme = forwardedProto;
+    await next();
 });
 
 if (!app.Environment.IsDevelopment())
