@@ -119,6 +119,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
 {
     options.MultipartBodyLengthLimit = long.MaxValue;
 });
+builder.Services.AddHttpClient();
 builder.Services.AddScoped<ServerAuthenticationMessageHandler>();
 builder.Services.AddScoped(sp =>
 {
