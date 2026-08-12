@@ -120,6 +120,10 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
     options.MultipartBodyLengthLimit = long.MaxValue;
 });
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("AdminApi", client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["AppUrl"] ?? "http://localhost:5035");
+});
 builder.Services.AddScoped<ServerAuthenticationMessageHandler>();
 builder.Services.AddScoped(sp =>
 {

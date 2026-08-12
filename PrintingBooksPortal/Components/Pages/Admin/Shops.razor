@@ -568,8 +568,8 @@
 
         try
         {
-            var client = HttpClientFactory.CreateClient();
-            var response = await client.PostAsJsonAsync($"/api/admin/reset-shop-stats/{resettingShopId}", new { Password = resetPassword });
+            var client = HttpClientFactory.CreateClient("AdminApi");
+            var response = await client.PostAsJsonAsync($"reset-shop-stats/{resettingShopId}", new { Password = resetPassword });
             var result = await response.Content.ReadFromJsonAsync<ResetResponse>();
 
             if (response.IsSuccessStatusCode && result?.Success == true)
