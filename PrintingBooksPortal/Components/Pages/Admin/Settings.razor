@@ -3,10 +3,9 @@
 @rendermode InteractiveServer
 @inject ISettingsService SettingsService
 @inject UserManager<ApplicationUser> UserManager
-@inject SignInManager<ApplicationUser> SignInManager
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
-@inject IHttpContextAccessor HttpContextAccessor
+@inject AuthenticationStateProvider AuthStateProvider
 
 <div class="content-area">
     <div class="page-header">
@@ -317,20 +316,27 @@
         pwBusy = true;
         try
         {
-            var user = await UserManager.GetUserAsync(HttpContextAccessor?.HttpContext?.User);
+            // In an interactive Blazor circuit there is no HttpContext — use AuthStateProvider.
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = await UserManager.GetUserAsync(authState.User);
             if (user == null)
             {
-                pwError = "User not found.";
+                pwError = "Session expired. Please sign in again.";
                 return;
             }
 
             var result = await UserManager.ChangePasswordAsync(user, currentPassword, newPassword);
             if (result.Succeeded)
             {
-                pwMessage = "Password changed successfully. Please sign in again.";
                 currentPassword = newPassword = confirmPassword = "";
-                await SignInManager.SignOutAsync();
-                Navigation.NavigateTo("/login?message=" + Uri.EscapeDataString("Password changed. Please sign in again."));
+                pwMessage = "Password changed successfully. Signing you out…";
+                StateHasChanged();
+
+                // Small delay so the user sees the success message, then redirect
+                // to the dedicated signout endpoint (avoids "Headers read-only" on circuits).
+                await Task.Delay(1500);
+                var destination = Uri.EscapeDataString("/login?message=" + Uri.EscapeDataString("Password changed. Please sign in again."));
+                Navigation.NavigateTo($"/api/signout?returnUrl={destination}", forceLoad: true);
             }
             else
             {
@@ -339,7 +345,7 @@
         }
         catch (Exception ex)
         {
-            pwError = "Failed to change password: " + ex.Message;
+            pwError = "Failed to change password: " + ex.GetBaseException().Message;
         }
         finally
         {
