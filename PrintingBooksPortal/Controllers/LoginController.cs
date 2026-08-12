@@ -41,8 +41,9 @@ public class LoginController : ControllerBase
             var tenant = await db.Tenants.FindAsync(user.TenantId.Value);
             if (tenant == null || !tenant.IsActive)
             {
-                await _signInManager.SignOutAsync();
-                return Redirect("/login?error=" + Uri.EscapeDataString("Account is disabled. Contact your administrator."));
+                // Use the dedicated signout endpoint to avoid "Headers read-only" on Blazor SSR
+                var returnUrl = Uri.EscapeDataString("/login?error=" + Uri.EscapeDataString("Account is disabled. Contact your administrator."));
+                return Redirect($"/api/signout?returnUrl={returnUrl}");
             }
         }
 
@@ -81,7 +82,18 @@ public class LoginController : ControllerBase
         user.MustChangePassword = false;
         await _userManager.UpdateAsync(user);
 
+        // Redirect to the dedicated logout endpoint which handles SignOutAsync in its
+        // own render cycle — avoids "Headers are read-only" when called from Blazor SSR.
+        var returnUrl = Uri.EscapeDataString("/login?message=" + Uri.EscapeDataString("Password changed. Please sign in again."));
+        return Redirect($"/api/signout?returnUrl={returnUrl}");
+    }
+
+    [HttpGet("signout")]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> Signout([FromQuery] string? returnUrl)
+    {
         await _signInManager.SignOutAsync();
-        return Redirect("/login?message=" + Uri.EscapeDataString("Password changed. Please sign in again."));
+        var destination = string.IsNullOrWhiteSpace(returnUrl) ? "/login" : returnUrl;
+        return Redirect(destination);
     }
 }
