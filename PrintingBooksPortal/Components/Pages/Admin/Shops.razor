@@ -7,8 +7,9 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject ITenantContext TenantContext
-@inject IHttpClientFactory HttpClientFactory
 @inject IDataProtectionProvider DataProtection
+@inject UserManager<ApplicationUser> UserManager
+@inject IHttpContextAccessor HttpContextAccessor
 
 <div class="content-area">
     <div class="page-header">
@@ -568,32 +569,49 @@
 
         try
         {
-            var client = HttpClientFactory.CreateClient("AdminApi");
-            var response = await client.PostAsJsonAsync($"reset-shop-stats/{resettingShopId}", new { Password = resetPassword });
-            var result = await response.Content.ReadFromJsonAsync<ResetResponse>();
+            // Get current user
+            var user = await UserManager.GetUserAsync(HttpContextAccessor?.HttpContext?.User);
+            if (user == null)
+            {
+                resetError = "User not found.";
+                return;
+            }
 
-            if (response.IsSuccessStatusCode && result?.Success == true)
+            // Verify password
+            var passwordValid = await UserManager.CheckPasswordAsync(user, resetPassword);
+            if (!passwordValid)
             {
-                message = result.Message;
-                showResetModal = false;
-                resetPassword = "";
+                resetError = "Wrong password. Stats were NOT reset.";
+                return;
             }
-            else
+
+            // Verify shop belongs to user's tenant
+            var shop = await Db.Shops.FindAsync(resettingShopId);
+            if (shop == null)
             {
-                resetError = result?.Error ?? "Failed to reset statistics.";
+                resetError = "Shop not found.";
+                return;
             }
+
+            if (user.TenantId.HasValue && shop.TenantId != user.TenantId.Value)
+            {
+                resetError = "Access denied.";
+                return;
+            }
+
+            // Delete print logs
+            var logs = await Db.PrintLogs.Where(l => l.ShopId == resettingShopId).ToListAsync();
+            Db.PrintLogs.RemoveRange(logs);
+            await Db.SaveChangesAsync();
+
+            message = $"Statistics reset for '{shop.Name}' ({logs.Count} log entries removed).";
+            showResetModal = false;
+            resetPassword = "";
         }
         catch (Exception ex)
         {
             resetError = "Error: " + ex.Message;
         }
-    }
-
-    private class ResetResponse
-    {
-        public bool Success { get; set; }
-        public string? Message { get; set; }
-        public string? Error { get; set; }
     }
 
     private async Task DownloadReceipt(int shopId)
