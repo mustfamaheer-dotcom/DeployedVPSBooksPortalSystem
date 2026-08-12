@@ -7,6 +7,7 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject ITenantContext TenantContext
+@inject IHttpClientFactory HttpClientFactory
 @inject IDataProtectionProvider DataProtection
 
 <div class="content-area">
@@ -116,9 +117,9 @@
                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="1.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
                 </div>
                 <h5 class="mb-2">Reset Statistics</h5>
-                <p class="text-muted mb-3">This will delete all print logs for <strong>@resettingShopName</strong>. Enter password to confirm.</p>
+                <p class="text-muted mb-3">This will delete all print logs for <strong>@resettingShopName</strong>. Enter <strong>your teacher password</strong> to confirm.</p>
                 <div class="mb-3 text-start">
-                    <input @bind="resetPassword" type="password" class="form-control form-control-modern" placeholder="Enter password" />
+                    <input @bind="resetPassword" type="password" class="form-control form-control-modern" placeholder="Enter your password" />
                 </div>
                 @if (!string.IsNullOrEmpty(resetError))
                 {
@@ -559,18 +560,40 @@
 
     private async Task ConfirmReset()
     {
-        if (resetPassword != "0000")
+        if (string.IsNullOrWhiteSpace(resetPassword))
         {
-            resetError = "Wrong password. Stats were NOT reset.";
+            resetError = "Password is required.";
             return;
         }
 
-        var logs = await Db.PrintLogs.Where(l => l.ShopId == resettingShopId).ToListAsync();
-        Db.PrintLogs.RemoveRange(logs);
-        await Db.SaveChangesAsync();
-        message = $"Statistics reset for '{resettingShopName}' ({logs.Count} log entries removed).";
-        showResetModal = false;
-        resetPassword = "";
+        try
+        {
+            var client = HttpClientFactory.CreateClient();
+            var response = await client.PostAsJsonAsync($"/api/admin/reset-shop-stats/{resettingShopId}", new { Password = resetPassword });
+            var result = await response.Content.ReadFromJsonAsync<ResetResponse>();
+
+            if (response.IsSuccessStatusCode && result?.Success == true)
+            {
+                message = result.Message;
+                showResetModal = false;
+                resetPassword = "";
+            }
+            else
+            {
+                resetError = result?.Error ?? "Failed to reset statistics.";
+            }
+        }
+        catch (Exception ex)
+        {
+            resetError = "Error: " + ex.Message;
+        }
+    }
+
+    private class ResetResponse
+    {
+        public bool Success { get; set; }
+        public string? Message { get; set; }
+        public string? Error { get; set; }
     }
 
     private async Task DownloadReceipt(int shopId)

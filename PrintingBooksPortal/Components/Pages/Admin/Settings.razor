@@ -2,6 +2,11 @@
 @attribute [Authorize(Roles = "Teacher,SystemAdmin")]
 @rendermode InteractiveServer
 @inject ISettingsService SettingsService
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject IHttpContextAccessor HttpContextAccessor
 
 <div class="content-area">
     <div class="page-header">
@@ -108,6 +113,77 @@
     </div>
 </div>
 
+<!-- Change Password Section -->
+<div class="settings-grid mt-4">
+    <div class="setting-card">
+        <div class="setting-card-header">
+            <div class="setting-icon setting-icon-on">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+            </div>
+            <div>
+                <h3 class="setting-title">Change Password</h3>
+                <p class="setting-subtitle">Update your login password. You will need to enter your current password.</p>
+            </div>
+        </div>
+        <div class="setting-card-body">
+            @if (!string.IsNullOrEmpty(pwMessage))
+            {
+                <div class="alert alert-modern alert-success">@pwMessage</div>
+            }
+            @if (!string.IsNullOrEmpty(pwError))
+            {
+                <div class="alert alert-modern alert-danger">@pwError</div>
+            }
+
+            <form @onsubmit="ChangePassword">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Current Password <span class="req">*</span></label>
+                        <div class="field-icon-wrap pw-wrap">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            <input type="password" class="form-control form-control-modern" placeholder="••••••••" @bind="currentPassword" required />
+                            <button type="button" class="pw-toggle" title="Show / Hide" @onclick="ToggleCurrentPassword">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">New Password <span class="req">*</span><span class="field-hint">min. 6 characters</span></label>
+                        <div class="field-icon-wrap pw-wrap">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            <input type="password" class="form-control form-control-modern" placeholder="••••••••" @bind="newPassword" required />
+                            <button type="button" class="pw-toggle" title="Show / Hide" @onclick="ToggleNewPassword">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Confirm New Password <span class="req">*</span></label>
+                        <div class="field-icon-wrap pw-wrap">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            <input type="password" class="form-control form-control-modern" placeholder="••••••••" @bind="confirmPassword" required />
+                            <button type="button" class="pw-toggle" title="Show / Hide" @onclick="ToggleConfirmPassword">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="watermark-actions mt-3">
+                    <button type="submit" class="btn btn-primary" disabled="@pwBusy">
+                        @if (pwBusy)
+                        {
+                            <span class="loading-spinner me-1"></span>
+                        }
+                        @(pwBusy ? "Changing..." : "Change Password")
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 @code {
     private bool watermarkEnabled = true;
     private string? message;
@@ -118,6 +194,17 @@
     private bool savingText;
     private string? textMessage;
     private string? textError;
+
+    // Change Password
+    private string currentPassword = "";
+    private string newPassword = "";
+    private string confirmPassword = "";
+    private string? pwMessage;
+    private string? pwError;
+    private bool pwBusy;
+    private bool showCurrent = false;
+    private bool showNew = false;
+    private bool showConfirm = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -178,5 +265,85 @@
             .Replace("{date}", DateTime.Now.ToEgyptLocal().ToString("yyyy-MM-dd HH:mm"))
             .Replace("{timestamp}", DateTime.Now.ToEgyptLocal().ToString("yyyy-MM-dd HH:mm:ss"));
         return preview.Split('\n');
+    }
+
+    private void ToggleCurrentPassword()
+    {
+        showCurrent = !showCurrent;
+        if (showCurrent) JS.InvokeVoidAsync("revealPassword", "currentPassword");
+        else JS.InvokeVoidAsync("concealPassword", "currentPassword");
+    }
+
+    private void ToggleNewPassword()
+    {
+        showNew = !showNew;
+        if (showNew) JS.InvokeVoidAsync("revealPassword", "newPassword");
+        else JS.InvokeVoidAsync("concealPassword", "newPassword");
+    }
+
+    private void ToggleConfirmPassword()
+    {
+        showConfirm = !showConfirm;
+        if (showConfirm) JS.InvokeVoidAsync("revealPassword", "confirmPassword");
+        else JS.InvokeVoidAsync("concealPassword", "confirmPassword");
+    }
+
+    private async Task ChangePassword()
+    {
+        pwMessage = null;
+        pwError = null;
+
+        if (string.IsNullOrWhiteSpace(currentPassword))
+        {
+            pwError = "Current password is required.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(newPassword))
+        {
+            pwError = "New password is required.";
+            return;
+        }
+        if (newPassword.Length < 6)
+        {
+            pwError = "New password must be at least 6 characters.";
+            return;
+        }
+        if (newPassword != confirmPassword)
+        {
+            pwError = "New passwords do not match.";
+            return;
+        }
+
+        pwBusy = true;
+        try
+        {
+            var user = await UserManager.GetUserAsync(HttpContextAccessor?.HttpContext?.User);
+            if (user == null)
+            {
+                pwError = "User not found.";
+                return;
+            }
+
+            var result = await UserManager.ChangePasswordAsync(user, currentPassword, newPassword);
+            if (result.Succeeded)
+            {
+                pwMessage = "Password changed successfully. Please sign in again.";
+                currentPassword = newPassword = confirmPassword = "";
+                await SignInManager.SignOutAsync();
+                Navigation.NavigateTo("/login?message=" + Uri.EscapeDataString("Password changed. Please sign in again."));
+            }
+            else
+            {
+                pwError = string.Join("; ", result.Errors.Select(e => e.Description));
+            }
+        }
+        catch (Exception ex)
+        {
+            pwError = "Failed to change password: " + ex.Message;
+        }
+        finally
+        {
+            pwBusy = false;
+        }
     }
 }

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PdfSharpCore;
@@ -19,12 +20,14 @@ public class AdminController : ControllerBase
     private readonly AppDbContext _db;
     private readonly FileStorageService _fileStorage;
     private readonly ITenantContext _tenantContext;
+    private readonly UserManager<ApplicationUser> _userManager;
 
-    public AdminController(AppDbContext db, FileStorageService fileStorage, ITenantContext tenantContext)
+    public AdminController(AppDbContext db, FileStorageService fileStorage, ITenantContext tenantContext, UserManager<ApplicationUser> userManager)
     {
         _db = db;
         _fileStorage = fileStorage;
         _tenantContext = tenantContext;
+        _userManager = userManager;
     }
 
     [HttpPost("books/upload")]
@@ -121,15 +124,31 @@ public class AdminController : ControllerBase
     [HttpPost("reset-shop-stats/{shopId:int}")]
     public async Task<IActionResult> ResetShopStats(int shopId, [FromBody] ResetRequest request)
     {
-        if (request?.Password != "0000")
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null)
+            return Unauthorized();
+
+        // Verify the provided password matches the current user's password
+        if (string.IsNullOrWhiteSpace(request?.Password))
+            return BadRequest(new { success = false, error = "Password is required." });
+
+        var passwordValid = await _userManager.CheckPasswordAsync(user, request.Password);
+        if (!passwordValid)
             return BadRequest(new { success = false, error = "Wrong password. Stats were NOT reset." });
+
+        // Verify the shop belongs to the user's tenant (for teachers)
+        var shop = await _db.Shops.FindAsync(shopId);
+        if (shop == null)
+            return NotFound(new { success = false, error = "Shop not found." });
+
+        if (user.TenantId.HasValue && shop.TenantId != user.TenantId.Value)
+            return Forbid();
 
         var logs = await _db.PrintLogs.Where(l => l.ShopId == shopId).ToListAsync();
         _db.PrintLogs.RemoveRange(logs);
         await _db.SaveChangesAsync();
 
-        var shop = await _db.Shops.FindAsync(shopId);
-        return Ok(new { success = true, message = $"Statistics reset for '{shop?.Name ?? "shop"}' ({logs.Count} log entries removed)." });
+        return Ok(new { success = true, message = $"Statistics reset for '{shop.Name}' ({logs.Count} log entries removed)." });
     }
 
     [HttpGet("shop-receipt/{shopId:int}")]
