@@ -123,6 +123,23 @@ public static class PdfPageSelection
         return string.Join(", ", parts);
     }
 
+    /// <summary>
+    /// Human-readable description for history tables: shows the selection AND the
+    /// number of printed pages, e.g. "All (6 pages)" or "2, 5 (2 pages)".
+    /// </summary>
+    public static string DescribePages(string? selection, int? bookPageCount)
+    {
+        var total = bookPageCount ?? 0;
+        if (string.IsNullOrWhiteSpace(selection) || selection.Trim().Equals("all", StringComparison.OrdinalIgnoreCase))
+            return total > 0 ? $"All ({total} pages)" : "All";
+
+        var trimmed = selection.Trim();
+        if (TryParse(trimmed, total > 0 ? total : int.MaxValue, out var pages, out _) && pages.Count > 0)
+            return $"{trimmed} ({pages.Count} {(pages.Count == 1 ? "page" : "pages")})";
+
+        return trimmed;
+    }
+
     private static List<(int Start, int End)> GetRanges(IReadOnlyList<int> pages)
     {
         var ranges = new List<(int Start, int End)>();

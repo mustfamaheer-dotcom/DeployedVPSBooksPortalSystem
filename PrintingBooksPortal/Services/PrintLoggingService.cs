@@ -49,6 +49,7 @@ public class PrintLoggingService
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.PrintLogs
+            .Include(l => l.Book)
             .OrderByDescending(l => l.PrintedAt)
             .Take(count)
             .ToListAsync();
@@ -94,14 +95,39 @@ public class PrintLoggingService
         public int Total { get; init; }
     }
 
-    public async Task<Dictionary<string, int>> GetPrintsPerBookAsync()
+    public async Task<List<BookPrintStat>> GetPrintsPerBookAsync()
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.PrintLogs
-            .GroupBy(l => l.BookTitle)
-            .Select(g => new { Book = g.Key, Total = g.Sum(l => l.Copies) })
-            .ToDictionaryAsync(x => x.Book, x => x.Total);
+            .GroupBy(l => new { l.BookId, l.BookTitle })
+            .Select(g => new BookPrintStat
+            {
+                BookId = g.Key.BookId,
+                BookTitle = g.Key.BookTitle,
+                Total = g.Sum(l => l.Copies)
+            })
+            .OrderByDescending(b => b.Total)
+            .ToListAsync();
+    }
+
+    public record BookPrintStat
+    {
+        public int BookId { get; init; }
+        public string BookTitle { get; init; } = "";
+        public int Total { get; init; }
+    }
+
+    public async Task<List<PrintLog>> GetBookLogsAsync(int bookId, int count = 100)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.PrintLogs
+            .Include(l => l.Book)
+            .Where(l => l.BookId == bookId)
+            .OrderByDescending(l => l.PrintedAt)
+            .Take(count)
+            .ToListAsync();
     }
 
     public async Task<List<PrintLog>> GetShopLogsAsync(int shopId, int count = 100)
@@ -109,6 +135,7 @@ public class PrintLoggingService
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.PrintLogs
+            .Include(l => l.Book)
             .Where(l => l.ShopId == shopId)
             .OrderByDescending(l => l.PrintedAt)
             .Take(count)

@@ -91,8 +91,32 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers().ConfigureApiBehaviorOptions(options =>
+{
+    // API payloads use a uniform { success, error } shape; automatic model-state
+    // failures must not leak the default ProblemDetails body.
+    options.InvalidModelStateResponseFactory = context =>
+        new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(new
+        {
+            success = false,
+            error = string.Join("; ", context.ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage) ? "Invalid value." : e.ErrorMessage))
+        });
+});
 builder.Services.AddSignalR();
+
+// Uploads: the app-level limit is 100 MB per book PDF; give Kestrel and the
+// multipart parser headroom beyond that so the friendly controller error fires
+// first instead of a bare 413.
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 250L * 1024 * 1024;
+});
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 250L * 1024 * 1024;
+});
 builder.Services.AddScoped<ServerAuthenticationMessageHandler>();
 builder.Services.AddScoped(sp =>
 {

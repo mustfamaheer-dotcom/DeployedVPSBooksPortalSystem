@@ -74,7 +74,16 @@ public class AdminController : ControllerBase
 
         if (file != null && file.Length > 0)
         {
-            var newFile = await _fileStorage.SaveFileAsync(file);
+            string newFile;
+            try
+            {
+                newFile = await _fileStorage.SaveFileAsync(file);
+            }
+            catch
+            {
+                return BadRequest(new { success = false, error = "Could not store the PDF file on the server." });
+            }
+
             var oldFile = book.FilePath;
             book.FilePath = newFile;
             book.OriginalFileName = file.FileName;
@@ -100,7 +109,9 @@ public class AdminController : ControllerBase
         var message = request.BookId > 0
             ? $"Book '{book.Title}' updated successfully."
             : $"Book '{book.Title}' uploaded successfully.";
-        return Ok(new { success = true, message, bookId = book.Id });
+        if (book.PageCount > 0)
+            message += $" ({book.PageCount} pages)";
+        return Ok(new { success = true, message, bookId = book.Id, pageCount = book.PageCount });
     }
 
     [HttpPost("reset-shop-stats/{shopId:int}")]

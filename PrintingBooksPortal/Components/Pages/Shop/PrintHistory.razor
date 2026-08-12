@@ -57,7 +57,7 @@
                                 <tr>
                                     <td class="text-muted">@log.PrintedAt.ToEgyptLocal().ToString("g")</td>
                                     <td><strong>@log.BookTitle</strong></td>
-                                    <td><span class="pages-badge">@(log.Pages ?? "All")</span></td>
+                                    <td><span class="pages-badge">@PdfPageSelection.DescribePages(log.Pages, log.Book?.PageCount)</span></td>
                                     <td><span class="count-badge">@log.Copies</span></td>
                                     <td>@log.PrintedByUserName</td>
                                     <td><code class="ip-badge">@log.IPAddress</code></td>
