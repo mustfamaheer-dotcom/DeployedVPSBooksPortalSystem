@@ -111,11 +111,11 @@ builder.Services.AddSignalR();
 // first instead of a bare 413.
 builder.WebHost.ConfigureKestrel(options =>
 {
-    options.Limits.MaxRequestBodySize = 250L * 1024 * 1024;
+    options.Limits.MaxRequestBodySize = 1024L * 1024 * 1024;
 });
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
 {
-    options.MultipartBodyLengthLimit = 250L * 1024 * 1024;
+    options.MultipartBodyLengthLimit = 1024L * 1024 * 1024;
 });
 builder.Services.AddScoped<ServerAuthenticationMessageHandler>();
 builder.Services.AddScoped(sp =>

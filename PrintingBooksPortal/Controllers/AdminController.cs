@@ -61,7 +61,15 @@ public class AdminController : ControllerBase
             if (request.BoardId <= 0)
                 return BadRequest(new { success = false, error = "Please select a board." });
 
-            book = new Book { TenantId = _tenantContext.TenantId };
+            // SystemAdmin has no tenant (TenantId = 0) and Books carries an FK to
+            // Tenants, so newly created books fall back to the first active tenant.
+            var tenantId = _tenantContext.TenantId > 0
+                ? _tenantContext.TenantId
+                : await _db.Tenants.Where(t => t.IsActive).OrderBy(t => t.Id).Select(t => (int?)t.Id).FirstOrDefaultAsync() ?? 0;
+            if (tenantId <= 0)
+                return BadRequest(new { success = false, error = "No active tenant is configured. Contact the administrator." });
+
+            book = new Book { TenantId = tenantId };
             _db.Books.Add(book);
         }
 
