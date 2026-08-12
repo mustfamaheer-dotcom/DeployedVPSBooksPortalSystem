@@ -405,7 +405,7 @@
     {
         if (!string.IsNullOrEmpty(credLogin))
         {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", credLogin);
+            await JS.InvokeVoidAsync("copyToClipboard", credLogin);
             copied = "login";
         }
     }
@@ -414,7 +414,7 @@
     {
         if (!string.IsNullOrEmpty(credPassword))
         {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", credPassword);
+            await JS.InvokeVoidAsync("copyToClipboard", credPassword);
             copied = "password";
         }
     }
