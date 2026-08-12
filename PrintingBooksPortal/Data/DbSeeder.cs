@@ -107,9 +107,16 @@ public static class DbSeeder
                     }
                 }
             }
-            else if (!await userManager.IsInRoleAsync(official, "SystemAdmin"))
+            else
             {
-                await userManager.AddToRoleAsync(official, "SystemAdmin");
+                // Ensure the SystemAdmin role is assigned
+                if (!await userManager.IsInRoleAsync(official, "SystemAdmin"))
+                    await userManager.AddToRoleAsync(official, "SystemAdmin");
+
+                // Sync password to the configured value in case the hash is stale
+                // (e.g. after a password change in appsettings / env var).
+                var resetToken = await userManager.GeneratePasswordResetTokenAsync(official);
+                await userManager.ResetPasswordAsync(official, resetToken, sysAdminPassword);
             }
 
             // Heal: ensure only the ONE official account holds SystemAdmin
