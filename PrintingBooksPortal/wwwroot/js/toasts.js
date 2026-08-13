@@ -101,4 +101,7 @@
         var el = document.getElementById(id);
         if (el) el.type = 'password';
     };
+
+    // ── Toast notifications (bound by Blazor via InvokeVoidAsync) ─────────────
+    window.showToast = showToast;
 })();

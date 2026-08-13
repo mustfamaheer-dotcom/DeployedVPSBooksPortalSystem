@@ -506,12 +506,12 @@
             }
             generatedKey = ApiKeys.GenerateKey(tenantId, keyShop.Id);
             await LoadShopKeys();
-            await JS.InvokeVoidAsync("showToast", $"API key generated for '{keyShop.Name}'.", "success");
+            try { await JS.InvokeVoidAsync("showToast", $"API key generated for '{keyShop.Name}'.", "success"); } catch { }
         }
         catch (Exception ex)
         {
             error = $"Key generation failed: {ex.Message}";
-            await JS.InvokeVoidAsync("showToast", error, "error");
+            try { await JS.InvokeVoidAsync("showToast", error, "error"); } catch { }
         }
         finally
         {
@@ -525,7 +525,7 @@
         {
             await ApiKeys.RevokeKeyAsync(keyId);
             await LoadShopKeys();
-            await JS.InvokeVoidAsync("showToast", "API key revoked. The agent using it is now disconnected.", "success");
+            try { await JS.InvokeVoidAsync("showToast", "API key revoked. The agent using it is now disconnected.", "success"); } catch { }
         }
         catch (Exception ex)
         {
