@@ -104,6 +104,10 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<TenantApiKey>()
             .HasIndex(k => k.ShopId);
 
+        builder.Entity<TenantApiKey>()
+            .HasOne(k => k.Shop).WithMany()
+            .HasForeignKey(k => k.ShopId).OnDelete(DeleteBehavior.Cascade);
+
         builder.Entity<PrintLog>()
             .HasIndex(l => l.TenantId);
 
@@ -145,6 +149,10 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
 
         builder.Entity<RegisteredPrinter>()
             .HasIndex(p => p.LastSeen);
+
+        builder.Entity<RegisteredPrinter>()
+            .HasOne(p => p.Shop).WithMany()
+            .HasForeignKey(p => p.ShopId).OnDelete(DeleteBehavior.Cascade);
 
         // ── global query filters (multi-tenancy on) ──
         // SystemAdmin (no TenantId) sees ALL tenants; regular users see only
