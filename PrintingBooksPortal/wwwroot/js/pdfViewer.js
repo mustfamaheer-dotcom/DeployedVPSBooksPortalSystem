@@ -372,17 +372,12 @@
 
         function onPrintersFetched(printers, connected, stale, lastSeen) {
             lastKnownPrinters = printers;
-            var previous = select.value;
-            var previousExisted = false;
-            var defaultSet = false;
 
             select.innerHTML = '<option value="">Select a printer…</option>';
 
             printers.forEach(function (p) {
                 if (!p.name) return;
                 var isOnline = p.isOnline !== false;
-                var matchesPrevious = previous && p.name.trim().toLowerCase() === previous.trim().toLowerCase();
-                if (matchesPrevious) previousExisted = true;
 
                 var opt = document.createElement('option');
                 opt.value = p.name;
@@ -397,18 +392,6 @@
                 opt.textContent = p.name + '  ' + badge + ' ' + (p.connectionType || 'Local') + (isOnline ? '' : '  (offline)');
                 if (!isOnline) opt.disabled = true; // cannot select an offline printer
                 select.appendChild(opt);
-
-                // Restore the user's previous selection if it still exists;
-                // otherwise (no choice yet, or it vanished) auto-select the agent's default.
-                var shouldDefault = (!previous || !previousExisted) && p.isDefault && isOnline && !defaultSet;
-                if (matchesPrevious) {
-                    opt.selected = true;
-                    settings.printerName = p.name;
-                } else if (shouldDefault) {
-                    opt.selected = true;
-                    settings.printerName = p.name;
-                    defaultSet = true;
-                }
             });
 
             if (statusDot) {
@@ -875,6 +858,10 @@
 
             var printerSelect = document.getElementById('printerSelect');
             var printerName = printerSelect ? printerSelect.value : settings.printerName;
+
+            if (!printerName) {
+                throw new Error('Please select a printer from the list, then click Print again.');
+            }
 
             var paperSizeSelect = document.getElementById('paperSizeSelect');
             var paperSize = paperSizeSelect ? paperSizeSelect.value : settings.paperSize;
