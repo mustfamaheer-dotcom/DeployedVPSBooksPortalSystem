@@ -180,7 +180,7 @@ public class SecurePdfController : ControllerBase
         // Accuracy gate: never queue a job for a printer the agent does not currently
         // detect — otherwise the job would silently fail or fall back to the wrong printer.
         // Skipped when the agent has not reported a printer list yet (cannot validate).
-        var printerCheck = AgentStatusTracker.HasPrinter(request.PrinterName);
+        var printerCheck = AgentStatusTracker.HasPrinter(request.PrinterName, tenantId);
         if (printerCheck == false)
             return BadRequest(new
             {
@@ -456,7 +456,8 @@ public class SecurePdfController : ControllerBase
         if (string.IsNullOrEmpty(key) || await _apiKeys.ResolveTenantAsync(key) == 0)
             return Unauthorized(new { error = "Valid API key required." });
 
-        AgentStatusTracker.RecordHeartbeat(request?.Printers ?? new(), await _apiKeys.ResolveTenantAsync(key));
+        var tenantId = await _apiKeys.ResolveTenantAsync(key);
+        AgentStatusTracker.RecordHeartbeat(HashAgentKey(key), request?.Printers ?? new(), tenantId);
         return Ok(new { success = true });
     }
 
@@ -464,7 +465,22 @@ public class SecurePdfController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> AgentStatus()
     {
-        return Ok(AgentStatusTracker.GetStatus());
+        // Show the printers of the agent(s) of the caller's own tenant — the website
+        // must list exactly what the shop's agent reads, never another agent's list.
+        var tenantId = _tenantContext.TenantId;
+        if (tenantId <= 0)
+        {
+            var key = HttpContext.Request.Headers["X-Api-Key"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(key))
+                tenantId = await _apiKeys.ResolveTenantAsync(key);
+        }
+        return Ok(AgentStatusTracker.GetStatus(tenantId > 0 ? tenantId : null));
+    }
+
+    private static string HashAgentKey(string key)
+    {
+        var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key));
+        return Convert.ToHexString(bytes);
     }
 
     [HttpGet("print-agent/debug")]
@@ -631,83 +647,96 @@ public static class AgentStatusTracker
     // and >60s as offline.
     private const double OfflineAfterSeconds = 60;
     private const double StaleAfterSeconds = 30;
-    // Printers stay visible in the list for 60s after their last report. More than
-    // one agent can report to the same tenant (e.g. a dev machine plus the shop PC),
-    // so the list is the union of printers reported by all recently active agents
-    // instead of a single slot that every heartbeat overwrites (which made the list
-    // flip between machines and reject printers picked moments earlier).
-    private static readonly TimeSpan DisplayWindow = TimeSpan.FromSeconds(60);
-    // A printer name stays "known" for 10 minutes after its last report so a job
-    // picked from the list is never falsely rejected between heartbeat updates.
-    private static readonly TimeSpan HistoryWindow = TimeSpan.FromMinutes(10);
+    // Forget agents that stopped heartbeating after 10 minutes.
+    private static readonly TimeSpan AgentLifetime = TimeSpan.FromMinutes(10);
 
-    private static DateTime _lastSeen = DateTime.MinValue;
-    private static int _tenantId;
-    private static readonly Dictionary<string, AgentPrinterInfo> _printers = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly Dictionary<string, DateTime> _seen = new(StringComparer.OrdinalIgnoreCase);
+    // One slot PER AGENT, keyed by a hash of the agent's API key. Each agent has its
+    // own key (one key per shop), so agents never overwrite each other. A slot holds
+    // ONLY the printers the agent reported in its latest heartbeat — the website shows
+    // exactly what that agent reads right now, never a union or history of old reads.
+    private sealed class AgentState
+    {
+        public int TenantId;
+        public DateTime LastSeen = DateTime.MinValue;
+        public List<AgentPrinterInfo> Printers = new();
+    }
+
+    private static readonly Dictionary<string, AgentState> _agents = new(StringComparer.Ordinal);
     private static readonly object _lock = new();
 
-    public static void RecordHeartbeat(List<AgentPrinterInfo> printers, int tenantId)
+    public static void RecordHeartbeat(string agentKeyHash, List<AgentPrinterInfo> printers, int tenantId)
     {
         lock (_lock)
         {
             var now = DateTime.UtcNow;
-            _lastSeen = now;
-            _tenantId = tenantId;
-            foreach (var p in printers)
+            _agents[agentKeyHash] = new AgentState
             {
-                if (string.IsNullOrWhiteSpace(p.Name)) continue;
-                _printers[p.Name] = p;
-                _seen[p.Name] = now;
-            }
-            Prune(now);
+                TenantId = tenantId,
+                LastSeen = now,
+                Printers = printers ?? new()
+            };
+            foreach (var k in _agents.Where(kv => now - kv.Value.LastSeen > AgentLifetime).Select(kv => kv.Key).ToList())
+                _agents.Remove(k);
         }
     }
 
-    private static void Prune(DateTime now)
-    {
-        foreach (var k in _printers.Where(kv => now - _seen[kv.Key] > DisplayWindow).Select(kv => kv.Key).ToList())
-            _printers.Remove(k);
-        foreach (var k in _seen.Where(kv => now - kv.Value > HistoryWindow).Select(kv => kv.Key).ToList())
-            _seen.Remove(k);
-    }
-
-    public static bool IsConnected => (DateTime.UtcNow - _lastSeen).TotalSeconds < OfflineAfterSeconds;
-
-    public static object GetStatus()
+    /// <summary>Latest heartbeat among the agents of the given tenant (or all agents when tenantId is null).</summary>
+    private static AgentState? Latest(int? tenantId)
     {
         lock (_lock)
         {
-            var ageSeconds = _lastSeen == DateTime.MinValue ? double.MaxValue : (DateTime.UtcNow - _lastSeen).TotalSeconds;
-            return new
+            AgentState? best = null;
+            var bestSeen = DateTime.MinValue;
+            foreach (var s in _agents.Values)
             {
-                connected = ageSeconds < OfflineAfterSeconds,
-                stale = ageSeconds >= StaleAfterSeconds && ageSeconds < OfflineAfterSeconds,
-                lastSeen = _lastSeen == DateTime.MinValue ? (string?)null : _lastSeen.ToString("O"),
-                tenantId = _tenantId,
-                printers = _printers.Values.ToList()
-            };
+                if (tenantId.HasValue && s.TenantId != tenantId.Value) continue;
+                if (s.LastSeen > bestSeen) { bestSeen = s.LastSeen; best = s; }
+            }
+            return best;
         }
     }
 
+    public static object GetStatus(int? tenantId)
+    {
+        var state = Latest(tenantId);
+        var ageSeconds = state == null ? double.MaxValue : (DateTime.UtcNow - state.LastSeen).TotalSeconds;
+        return new
+        {
+            connected = ageSeconds < OfflineAfterSeconds,
+            stale = ageSeconds >= StaleAfterSeconds && ageSeconds < OfflineAfterSeconds,
+            lastSeen = state == null ? (string?)null : state.LastSeen.ToString("O"),
+            tenantId = state?.TenantId ?? 0,
+            printers = state?.Printers ?? new List<AgentPrinterInfo>()
+        };
+    }
+
     /// <summary>
-    /// Accuracy gate: checks a requested printer name against the printers any
-    /// agent has reported recently. Returns true for empty names (agent prints to
-    /// default), false when the name is unknown to every agent, and null when no
-    /// agent has ever reported printers (nothing to validate against, e.g. right
-    /// after a server restart).
+    /// Accuracy gate: checks a requested printer name against the CURRENT printers
+    /// reported by the agents of the caller's tenant. Returns true for empty names
+    /// (agent prints to default), false when the name is not read by any agent of
+    /// that tenant right now, and null when no agent has ever reported printers
+    /// (nothing to validate against, e.g. right after a server restart).
     /// </summary>
-    public static bool? HasPrinter(string? printerName)
+    public static bool? HasPrinter(string? printerName, int? tenantId)
     {
         if (string.IsNullOrWhiteSpace(printerName))
             return true;
 
         lock (_lock)
         {
-            if (_seen.Count == 0)
+            if (_agents.Count == 0)
                 return null;
-            return _seen.TryGetValue(printerName.Trim(), out var seen) &&
-                   DateTime.UtcNow - seen <= HistoryWindow;
+
+            bool anyKnown = false;
+            foreach (var s in _agents.Values)
+            {
+                if (tenantId.HasValue && s.TenantId != tenantId.Value) continue;
+                anyKnown = true;
+                if (s.Printers.Any(p =>
+                    string.Equals(p.Name?.Trim(), printerName.Trim(), StringComparison.OrdinalIgnoreCase)))
+                    return true;
+            }
+            return anyKnown ? false : (bool?)null;
         }
     }
 }
