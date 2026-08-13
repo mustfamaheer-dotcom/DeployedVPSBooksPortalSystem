@@ -22,7 +22,7 @@ public class SetupForm : Form
     private void InitializeComponent()
     {
         Text = "BookShop Print Agent - Setup";
-        ClientSize = new Size(500, 330);
+        ClientSize = new Size(560, 340);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -44,7 +44,7 @@ public class SetupForm : Form
         {
             Text = "Configure your shop's connection to the DR Bahig Books Portal",
             Location = new Point(20, 50),
-            Size = new Size(460, 20),
+            Size = new Size(520, 20),
             ForeColor = Color.FromArgb(180, 180, 200)
         };
 
@@ -59,7 +59,7 @@ public class SetupForm : Form
         serverUrlTextBox = new TextBox
         {
             Location = new Point(20, 115),
-            Size = new Size(460, 25),
+            Size = new Size(520, 25),
             BackColor = Color.FromArgb(45, 50, 65),
             ForeColor = Color.White,
             BorderStyle = BorderStyle.FixedSingle,
@@ -77,7 +77,7 @@ public class SetupForm : Form
         apiKeyTextBox = new TextBox
         {
             Location = new Point(20, 175),
-            Size = new Size(460, 25),
+            Size = new Size(520, 25),
             BackColor = Color.FromArgb(45, 50, 65),
             ForeColor = Color.White,
             BorderStyle = BorderStyle.FixedSingle,
@@ -88,7 +88,7 @@ public class SetupForm : Form
         {
             Text = "Each bookshop has its own key. With it, the portal shows only the printers detected on THIS computer.",
             Location = new Point(20, 202),
-            Size = new Size(460, 16),
+            Size = new Size(520, 16),
             ForeColor = Color.FromArgb(140, 142, 155),
             Font = new Font("Segoe UI", 8)
         };
@@ -121,7 +121,7 @@ public class SetupForm : Form
         {
             Text = "",
             Location = new Point(20, 268),
-            Size = new Size(460, 20),
+            Size = new Size(520, 20),
             ForeColor = Color.FromArgb(180, 180, 200)
         };
 
@@ -183,7 +183,7 @@ public class SetupForm : Form
             using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
             client.DefaultRequestHeaders.Add("X-Api-Key", trimmedKey);
             
-            var response = await client.GetAsync($"{serverUrlTextBox.Text.TrimEnd('/')}/api/pdf/print-agent/test");
+            var response = await client.PostAsync($"{serverUrlTextBox.Text.TrimEnd('/')}/api/pdf/print-agent/test", null);
             
             if (response.IsSuccessStatusCode)
             {

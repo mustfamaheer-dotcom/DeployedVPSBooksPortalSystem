@@ -14,6 +14,10 @@ namespace PrintingBooksPortal.Controllers;
 [Route("api/pdf")]
 public class SecurePdfController : ControllerBase
 {
+    // Agent heartbeats every ~3s; mirror the tracker's thresholds for UI status.
+    private const double OfflineAfterSeconds = 60;
+    private const double StaleAfterSeconds = 30;
+
     private readonly AppDbContext _db;
     private readonly FileStorageService _fileStorage;
     private readonly UserManager<ApplicationUser> _userManager;
@@ -186,7 +190,7 @@ public class SecurePdfController : ControllerBase
         // Shop users are validated against THEIR OWN shop's agent only (unless the
         // single-agent "ServeAllTenants" mode is enabled — then any agent's printers count).
         var shopScope = ServeAllTenants ? (int?)null : user.ShopId;
-        var printerCheck = AgentStatusTracker.HasPrinter(request.PrinterName, tenantId, shopScope);
+        var printerCheck = await _printerRegistration.HasPrinterAsync(request.PrinterName, tenantId, shopScope);
         if (printerCheck == false)
             return BadRequest(new
             {
@@ -502,7 +506,36 @@ public class SecurePdfController : ControllerBase
             }
         }
 
-        return Ok(AgentStatusTracker.GetStatus(tenantId > 0 ? tenantId : null, shopId));
+        if (tenantId <= 0)
+            return Ok(new { connected = false, stale = false, lastSeen = (string?)null, tenantId = 0, shopId = 0, printers = new List<AgentPrinterInfo>() });
+
+        // Authoritative source: the database, which every agent heartbeat updates.
+        // The in-memory tracker is lost on restart and is per-instance, so it can
+        // show a stale or empty list — the DB can't.
+        var currentPrinters = await _printerRegistration.GetCurrentPrintersAsync(tenantId, shopId);
+        var newest = currentPrinters.Count > 0 ? currentPrinters.Max(p => p.LastSeen) : (DateTime?)null;
+        var ageSeconds = newest.HasValue ? (DateTime.UtcNow - newest.Value).TotalSeconds : double.MaxValue;
+
+        return Ok(new
+        {
+            connected = ageSeconds < OfflineAfterSeconds,
+            stale = ageSeconds >= StaleAfterSeconds && ageSeconds < OfflineAfterSeconds,
+            lastSeen = newest?.ToString("O"),
+            tenantId,
+            shopId = shopId ?? 0,
+            printers = currentPrinters.Select(p => new AgentPrinterInfo
+            {
+                Name = p.Name,
+                Port = p.Port,
+                ConnectionType = p.ConnectionType,
+                Driver = p.Driver,
+                Location = p.Location,
+                Comment = p.Comment,
+                IsDefault = p.IsDefault,
+                IsOnline = p.IsOnline,
+                Status = p.Status
+            }).ToList()
+        });
     }
 
     private static string HashAgentKey(string key)

@@ -11,6 +11,8 @@ public interface IPrinterRegistrationService
 {
     Task RegisterPrintersAsync(string apiKey, int? shopId, List<AgentPrinterInfo> printers);
     Task<List<RegisteredPrinter>> GetTenantPrintersAsync(int tenantId);
+    Task<List<RegisteredPrinter>> GetCurrentPrintersAsync(int tenantId, int? shopId);
+    Task<bool?> HasPrinterAsync(string? printerName, int tenantId, int? shopId);
     Task CleanupOfflinePrintersAsync();
 }
 
@@ -105,6 +107,43 @@ public class PrinterRegistrationService : IPrinterRegistrationService
             .Where(p => p.TenantId == tenantId)
             .OrderBy(p => p.Name)
             .ToListAsync();
+    }
+
+    /// <summary>
+    /// The printers the agent(s) in scope read RIGHT NOW, straight from the database.
+    /// An agent heartbeats every few seconds, refreshing LastSeen, so any row seen
+    /// within the last 60 seconds is the agent's current read — unlike an in-memory
+    /// cache, this survives restarts and is identical on every app instance.
+    /// </summary>
+    public async Task<List<RegisteredPrinter>> GetCurrentPrintersAsync(int tenantId, int? shopId)
+    {
+        var cutoff = DateTime.UtcNow.AddSeconds(-60);
+        var query = _db.RegisteredPrinters
+            .Where(p => p.TenantId == tenantId && p.LastSeen >= cutoff);
+
+        if (shopId.HasValue)
+            query = query.Where(p => p.ShopId == shopId);
+
+        return await query.OrderBy(p => p.Name).ToListAsync();
+    }
+
+    /// <summary>
+    /// Accuracy gate backed by the database: true when the printer name is currently
+    /// reported by an agent of the given scope, false when the scope has agents but
+    /// none of them reads that printer, null when the scope has no current agent
+    /// (nothing to validate against).
+    /// </summary>
+    public async Task<bool?> HasPrinterAsync(string? printerName, int tenantId, int? shopId)
+    {
+        if (string.IsNullOrWhiteSpace(printerName))
+            return true;
+
+        var current = await GetCurrentPrintersAsync(tenantId, shopId);
+        if (current.Count == 0)
+            return null;
+
+        return current.Any(p =>
+            string.Equals(p.Name?.Trim(), printerName.Trim(), StringComparison.OrdinalIgnoreCase));
     }
 
     public async Task CleanupOfflinePrintersAsync()
