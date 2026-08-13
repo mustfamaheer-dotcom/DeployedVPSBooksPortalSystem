@@ -178,6 +178,9 @@ a:hover { color: var(--primary-dark); }
 .status-active { background: #dcfce7; color: #166534; }
 .status-active .status-dot { background: #16a34a; box-shadow: 0 0 4px rgba(22,163,74,0.4); }
 
+.status-unassigned { background: #fef2f2; color: #991b1b; }
+.status-unassigned .status-dot { background: #ef4444; box-shadow: 0 0 4px rgba(239,68,68,0.4); }
+
 .status-inactive { background: var(--gray-100); color: var(--gray-600); }
 .status-inactive .status-dot { background: var(--gray-400); }
 
@@ -676,6 +679,9 @@ a:hover { color: var(--primary-dark); }
 
 .assign-row:hover { background: var(--gray-50); }
 .assign-row.assigned { background: rgba(16,185,129,0.04); }
+.assign-row.unassigned { background: rgba(239,68,68,0.04); }
+.assign-row.inactive { opacity: 0.55; cursor: not-allowed; }
+.assign-row.inactive:hover { background: inherit; }
 
 .assign-info { flex: 1; display: flex; flex-direction: column; }
 .assign-book-title { font-size: 0.875rem; font-weight: 500; color: var(--gray-800); }
@@ -693,6 +699,8 @@ a:hover { color: var(--primary-dark); }
 
 .toggle-switch.off { background: var(--gray-300); }
 .toggle-switch.on { background: var(--success); }
+.toggle-switch.unassigned { background: #f87171; }
+.toggle-switch.disabled { background: var(--gray-200); cursor: not-allowed; }
 
 .toggle-knob {
     width: 18px; height: 18px;

@@ -44,18 +44,21 @@
                         @if (expanded)
                         {
                             <div class="assign-card-body">
-                                @if (!books.Any(b => b.IsActive))
+                                @if (!books.Any())
                                 {
-                                    <p class="text-muted mb-0">No active books available.</p>
+                                    <p class="text-muted mb-0">No books available.</p>
                                 }
                                 else
                                 {
-                                    @foreach (var book in books.Where(b => b.IsActive).OrderBy(b => b.Title))
+                                    @foreach (var book in books.OrderBy(b => b.Title))
                                     {
                                         var isAssigned = assignedBooks.ContainsKey($"{shop.Id}-{book.Id}");
-                                        <div class="assign-row @(isAssigned ? "assigned" : "")" @onclick="() => ToggleAssignment(shop.Id, book.Id, !isAssigned)">
+                                        var bookActive = book.IsActive;
+                                        var statusClass = !bookActive ? "status-inactive" : (isAssigned ? "status-active" : "status-unassigned");
+                                        var statusText = !bookActive ? "Inactive" : (isAssigned ? "Assigned" : "Unassigned");
+                                        <div class="assign-row @(isAssigned ? "assigned" : "unassigned") @(!bookActive ? "inactive" : "")" @onclick="() => ToggleAssignment(shop.Id, book.Id, !isAssigned)" aria-disabled="@(!bookActive)">
                                             <div class="assign-check">
-                                                <div class="toggle-switch @(isAssigned ? "on" : "off")">
+                                                <div class="toggle-switch @(isAssigned ? "on" : "off") @(!bookActive ? "disabled" : "")">
                                                     <div class="toggle-knob"></div>
                                                 </div>
                                             </div>
@@ -64,6 +67,7 @@
                                                 <span class="assign-book-board">@book.Board?.Name</span>
                                             </div>
                                             <span class="assign-pages">@book.PageCount pgs</span>
+                                            <span class="status-badge @statusClass"><span class="status-dot"></span>@statusText</span>
                                         </div>
                                     }
                                 }
@@ -116,6 +120,10 @@
 
     private async Task ToggleAssignment(int shopId, int bookId, bool assigned)
     {
+        var book = books?.FirstOrDefault(b => b.Id == bookId);
+        if (book == null || !book.IsActive)
+            return;
+
         var existing = await Db.ShopBookAssignments
             .FirstOrDefaultAsync(a => a.ShopId == shopId && a.BookId == bookId);
 
