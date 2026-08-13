@@ -713,6 +713,13 @@
         foreach (var user in users)
             await UserManager.DeleteAsync(user);
 
+        // The shop's API keys and registered printers reference the shop (FK is NO ACTION),
+        // so remove them explicitly or the DELETE will be rejected by SQL Server.
+        var keys = await Db.TenantApiKeys.Where(k => k.ShopId == deletingShop.Id).ToListAsync();
+        Db.TenantApiKeys.RemoveRange(keys);
+        var printers = await Db.RegisteredPrinters.Where(p => p.ShopId == deletingShop.Id).ToListAsync();
+        Db.RegisteredPrinters.RemoveRange(printers);
+
         Db.Shops.Remove(deletingShop);
         await Db.SaveChangesAsync();
         await LoadShops();

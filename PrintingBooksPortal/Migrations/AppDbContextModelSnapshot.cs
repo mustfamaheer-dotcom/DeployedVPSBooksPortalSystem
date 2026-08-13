@@ -282,7 +282,7 @@ namespace PrintingBooksPortal.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("Books");
+                    b.ToTable("Books", (string)null);
                 });
 
             modelBuilder.Entity("PrintingBooksPortal.Models.EducationalBoard", b =>
@@ -315,7 +315,7 @@ namespace PrintingBooksPortal.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("EducationalBoards");
+                    b.ToTable("EducationalBoards", (string)null);
                 });
 
             modelBuilder.Entity("PrintingBooksPortal.Models.PrintLog", b =>
@@ -377,7 +377,7 @@ namespace PrintingBooksPortal.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("PrintLogs");
+                    b.ToTable("PrintLogs", (string)null);
                 });
 
             modelBuilder.Entity("PrintingBooksPortal.Models.RegisteredPrinter", b =>
@@ -463,7 +463,7 @@ namespace PrintingBooksPortal.Migrations
                         .IsUnique()
                         .HasFilter("[ShopId] IS NOT NULL");
 
-                    b.ToTable("RegisteredPrinters");
+                    b.ToTable("RegisteredPrinters", (string)null);
                 });
 
             modelBuilder.Entity("PrintingBooksPortal.Models.Shop", b =>
@@ -504,7 +504,7 @@ namespace PrintingBooksPortal.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("Shops");
+                    b.ToTable("Shops", (string)null);
                 });
 
             modelBuilder.Entity("PrintingBooksPortal.Models.ShopBookAssignment", b =>
@@ -539,7 +539,7 @@ namespace PrintingBooksPortal.Migrations
                     b.HasIndex("ShopId", "BookId")
                         .IsUnique();
 
-                    b.ToTable("ShopBookAssignments");
+                    b.ToTable("ShopBookAssignments", (string)null);
                 });
 
             modelBuilder.Entity("PrintingBooksPortal.Models.SystemSetting", b =>
@@ -573,7 +573,7 @@ namespace PrintingBooksPortal.Migrations
                         .IsUnique()
                         .HasFilter("[TenantId] IS NOT NULL");
 
-                    b.ToTable("SystemSettings");
+                    b.ToTable("SystemSettings", (string)null);
                 });
 
             modelBuilder.Entity("PrintingBooksPortal.Models.Tenant", b =>
@@ -619,7 +619,7 @@ namespace PrintingBooksPortal.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Tenants");
+                    b.ToTable("Tenants", (string)null);
                 });
 
             modelBuilder.Entity("PrintingBooksPortal.Models.TenantApiKey", b =>
@@ -661,7 +661,7 @@ namespace PrintingBooksPortal.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("TenantApiKeys");
+                    b.ToTable("TenantApiKeys", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -792,8 +792,7 @@ namespace PrintingBooksPortal.Migrations
                 {
                     b.HasOne("PrintingBooksPortal.Models.Shop", "Shop")
                         .WithMany()
-                        .HasForeignKey("ShopId")
-                        .OnDelete(DeleteBehavior.Cascade);
+                        .HasForeignKey("ShopId");
 
                     b.HasOne("PrintingBooksPortal.Models.Tenant", "Tenant")
                         .WithMany()
@@ -857,8 +856,7 @@ namespace PrintingBooksPortal.Migrations
                 {
                     b.HasOne("PrintingBooksPortal.Models.Shop", "Shop")
                         .WithMany()
-                        .HasForeignKey("ShopId")
-                        .OnDelete(DeleteBehavior.Cascade);
+                        .HasForeignKey("ShopId");
 
                     b.HasOne("PrintingBooksPortal.Models.Tenant", "Tenant")
                         .WithMany("ApiKeys")
