@@ -372,12 +372,16 @@
 
         function onPrintersFetched(printers, connected, stale, lastSeen) {
             lastKnownPrinters = printers;
+            var previous = select.value;
+            var previousExisted = false;
 
             select.innerHTML = '<option value="">Select a printer…</option>';
 
             printers.forEach(function (p) {
                 if (!p.name) return;
                 var isOnline = p.isOnline !== false;
+                var matchesPrevious = previous && p.name.trim().toLowerCase() === previous.trim().toLowerCase();
+                if (matchesPrevious) previousExisted = true;
 
                 var opt = document.createElement('option');
                 opt.value = p.name;
@@ -392,7 +396,20 @@
                 opt.textContent = p.name + '  ' + badge + ' ' + (p.connectionType || 'Local') + (isOnline ? '' : '  (offline)');
                 if (!isOnline) opt.disabled = true; // cannot select an offline printer
                 select.appendChild(opt);
+
+                // Keep the printer the user already chose (the list refreshes every
+                // 10s — never wipe their selection while they are still setting up).
+                if (matchesPrevious) {
+                    opt.selected = true;
+                    settings.printerName = p.name;
+                }
             });
+
+            // The chosen printer vanished from the agent's list — clear the choice
+            // so the user is asked to pick again before printing.
+            if (!previousExisted) {
+                settings.printerName = '';
+            }
 
             if (statusDot) {
                 statusDot.className = connected

@@ -631,20 +631,45 @@ public static class AgentStatusTracker
     // and >60s as offline.
     private const double OfflineAfterSeconds = 60;
     private const double StaleAfterSeconds = 30;
+    // Printers stay visible in the list for 60s after their last report. More than
+    // one agent can report to the same tenant (e.g. a dev machine plus the shop PC),
+    // so the list is the union of printers reported by all recently active agents
+    // instead of a single slot that every heartbeat overwrites (which made the list
+    // flip between machines and reject printers picked moments earlier).
+    private static readonly TimeSpan DisplayWindow = TimeSpan.FromSeconds(60);
+    // A printer name stays "known" for 10 minutes after its last report so a job
+    // picked from the list is never falsely rejected between heartbeat updates.
+    private static readonly TimeSpan HistoryWindow = TimeSpan.FromMinutes(10);
 
     private static DateTime _lastSeen = DateTime.MinValue;
-    private static List<AgentPrinterInfo> _printers = new();
     private static int _tenantId;
+    private static readonly Dictionary<string, AgentPrinterInfo> _printers = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, DateTime> _seen = new(StringComparer.OrdinalIgnoreCase);
     private static readonly object _lock = new();
 
     public static void RecordHeartbeat(List<AgentPrinterInfo> printers, int tenantId)
     {
         lock (_lock)
         {
-            _lastSeen = DateTime.UtcNow;
-            _printers = printers ?? new();
+            var now = DateTime.UtcNow;
+            _lastSeen = now;
             _tenantId = tenantId;
+            foreach (var p in printers)
+            {
+                if (string.IsNullOrWhiteSpace(p.Name)) continue;
+                _printers[p.Name] = p;
+                _seen[p.Name] = now;
+            }
+            Prune(now);
         }
+    }
+
+    private static void Prune(DateTime now)
+    {
+        foreach (var k in _printers.Where(kv => now - _seen[kv.Key] > DisplayWindow).Select(kv => kv.Key).ToList())
+            _printers.Remove(k);
+        foreach (var k in _seen.Where(kv => now - kv.Value > HistoryWindow).Select(kv => kv.Key).ToList())
+            _seen.Remove(k);
     }
 
     public static bool IsConnected => (DateTime.UtcNow - _lastSeen).TotalSeconds < OfflineAfterSeconds;
@@ -660,16 +685,17 @@ public static class AgentStatusTracker
                 stale = ageSeconds >= StaleAfterSeconds && ageSeconds < OfflineAfterSeconds,
                 lastSeen = _lastSeen == DateTime.MinValue ? (string?)null : _lastSeen.ToString("O"),
                 tenantId = _tenantId,
-                printers = _printers
+                printers = _printers.Values.ToList()
             };
         }
     }
 
     /// <summary>
-    /// Accuracy gate: checks a requested printer name against the agent's last known list.
-    /// Returns true for empty names (agent prints to default), false when the name is
-    /// NOT known to the agent, and null when the agent has never reported printers
-    /// (nothing to validate against, e.g. right after a server restart).
+    /// Accuracy gate: checks a requested printer name against the printers any
+    /// agent has reported recently. Returns true for empty names (agent prints to
+    /// default), false when the name is unknown to every agent, and null when no
+    /// agent has ever reported printers (nothing to validate against, e.g. right
+    /// after a server restart).
     /// </summary>
     public static bool? HasPrinter(string? printerName)
     {
@@ -678,10 +704,10 @@ public static class AgentStatusTracker
 
         lock (_lock)
         {
-            if (_printers.Count == 0)
+            if (_seen.Count == 0)
                 return null;
-            return _printers.Any(p =>
-                string.Equals(p.Name?.Trim(), printerName.Trim(), StringComparison.OrdinalIgnoreCase));
+            return _seen.TryGetValue(printerName.Trim(), out var seen) &&
+                   DateTime.UtcNow - seen <= HistoryWindow;
         }
     }
 }
