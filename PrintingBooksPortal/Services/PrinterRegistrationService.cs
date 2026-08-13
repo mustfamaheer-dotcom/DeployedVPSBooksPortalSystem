@@ -82,7 +82,10 @@ VALUES (s.TenantId, s.ShopId, s.Name, {p.Port ?? ""}, {p.ConnectionType ?? ""}, 
     public async Task<List<RegisteredPrinter>> GetCurrentPrintersAsync(int tenantId, int? shopId)
     {
         var cutoff = DateTime.UtcNow.AddSeconds(-60);
-        var query = _db.RegisteredPrinters
+        // IgnoreQueryFilters: the global tenant filter uses _tenantContext.TenantId,
+        // which is 0 for API-key-authenticated (anonymous) callers — but we already
+        // scope by the tenantId resolved from the caller's key/user explicitly.
+        var query = _db.RegisteredPrinters.IgnoreQueryFilters()
             .Where(p => p.TenantId == tenantId && p.LastSeen >= cutoff);
 
         if (shopId.HasValue)
