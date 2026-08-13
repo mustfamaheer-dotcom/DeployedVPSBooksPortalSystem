@@ -38,67 +38,31 @@ public class PrinterRegistrationService : IPrinterRegistrationService
         var agentKeyHash = HashKey(apiKey);
         var now = DateTime.UtcNow;
 
-        // Get existing printers for this agent (tenant + shop + key = exactly one agent)
-        var existingPrinters = await _db.RegisteredPrinters
-            .Where(p => p.TenantId == tenantId && p.ShopId == shopId && p.AgentKeyHash == agentKeyHash)
-            .ToListAsync();
-
-        foreach (var printer in printers)
+        // Atomic upsert (MERGE with HOLDLOCK): the old load-then-add approach raced —
+        // two concurrent heartbeats both saw "no existing row", both INSERTed, and the
+        // second hit the unique index, throwing every 3s and freezing LastSeen forever.
+        foreach (var p in printers)
         {
-            var existing = existingPrinters.FirstOrDefault(p => p.Name == printer.Name);
-
-            if (existing != null)
-            {
-                // Update existing printer
-                existing.Port = printer.Port ?? "";
-                existing.ConnectionType = printer.ConnectionType ?? "";
-                existing.Driver = printer.Driver ?? "";
-                existing.Location = printer.Location ?? "";
-                existing.Comment = printer.Comment ?? "";
-                existing.IsDefault = printer.IsDefault;
-                existing.IsOnline = printer.IsOnline;
-                existing.Status = printer.Status ?? "Unknown";
-                existing.LastSeen = now;
-                existing.UpdatedAt = now;
-            }
-            else
-            {
-                // Add new printer
-                _db.RegisteredPrinters.Add(new RegisteredPrinter
-                {
-                    TenantId = tenantId,
-                    ShopId = shopId,
-                    Name = printer.Name,
-                    Port = printer.Port ?? "",
-                    ConnectionType = printer.ConnectionType ?? "",
-                    Driver = printer.Driver ?? "",
-                    Location = printer.Location ?? "",
-                    Comment = printer.Comment ?? "",
-                    IsDefault = printer.IsDefault,
-                    IsOnline = printer.IsOnline,
-                    Status = printer.Status ?? "Unknown",
-                    AgentKeyHash = agentKeyHash,
-                    LastSeen = now,
-                    CreatedAt = now,
-                    UpdatedAt = now
-                });
-            }
+            await _db.Database.ExecuteSqlInterpolatedAsync($@"
+MERGE dbo.RegisteredPrinters WITH (HOLDLOCK) AS t
+USING (VALUES ({tenantId}, {shopId}, {agentKeyHash}, {p.Name})) AS s (TenantId, ShopId, AgentKeyHash, Name)
+ON t.TenantId = s.TenantId AND t.ShopId = s.ShopId AND t.AgentKeyHash = s.AgentKeyHash AND t.Name = s.Name
+WHEN MATCHED THEN UPDATE SET
+    t.Port = {p.Port ?? ""},
+    t.ConnectionType = {p.ConnectionType ?? ""},
+    t.Driver = {p.Driver ?? ""},
+    t.Location = {p.Location ?? ""},
+    t.Comment = {p.Comment ?? ""},
+    t.IsDefault = {p.IsDefault},
+    t.IsOnline = {p.IsOnline},
+    t.Status = {p.Status ?? "Unknown"},
+    t.LastSeen = {now},
+    t.UpdatedAt = {now}
+WHEN NOT MATCHED THEN INSERT (TenantId, ShopId, Name, Port, ConnectionType, Driver, Location, Comment, IsDefault, IsOnline, Status, AgentKeyHash, LastSeen, CreatedAt, UpdatedAt)
+VALUES (s.TenantId, s.ShopId, s.Name, {p.Port ?? ""}, {p.ConnectionType ?? ""}, {p.Driver ?? ""}, {p.Location ?? ""}, {p.Comment ?? ""}, {p.IsDefault}, {p.IsOnline}, {p.Status ?? "Unknown"}, s.AgentKeyHash, {now}, {now}, {now});");
         }
 
-        // Mark printers as offline if they're no longer reported by this agent
-        var reportedPrinterNames = printers.Select(p => p.Name).ToHashSet();
-        var offlinePrinters = existingPrinters.Where(p => !reportedPrinterNames.Contains(p.Name));
-
-        foreach (var offlinePrinter in offlinePrinters)
-        {
-            offlinePrinter.IsOnline = false;
-            offlinePrinter.Status = "Offline";
-            offlinePrinter.UpdatedAt = now;
-        }
-
-        await _db.SaveChangesAsync();
-
-        _logger.LogInformation("Updated {Count} printers for tenant {TenantId} shop {ShopId}", printers.Count, tenantId, shopId);
+        _logger.LogInformation("Upserted {Count} printers for tenant {TenantId} shop {ShopId}", printers.Count, tenantId, shopId);
     }
 
     public async Task<List<RegisteredPrinter>> GetTenantPrintersAsync(int tenantId)
