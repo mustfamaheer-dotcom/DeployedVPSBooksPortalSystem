@@ -25,28 +25,6 @@ namespace PrintingBooksPortal.Migrations
                 type: "int",
                 nullable: true);
 
-            migrationBuilder.AlterColumn<int>(
-                name: "TenantId",
-                table: "SystemSettings",
-                type: "int",
-                nullable: true,
-                oldClrType: typeof(int),
-                oldType: "int");
-
-            migrationBuilder.AddColumn<string>(
-                name: "StoredPassword",
-                table: "Shops",
-                type: "nvarchar(2000)",
-                maxLength: 2000,
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "Pages",
-                table: "PrintLogs",
-                type: "nvarchar(200)",
-                maxLength: 200,
-                nullable: true);
-
             migrationBuilder.CreateTable(
                 name: "RegisteredPrinters",
                 columns: table => new
@@ -164,24 +142,6 @@ namespace PrintingBooksPortal.Migrations
             migrationBuilder.DropColumn(
                 name: "ShopId",
                 table: "TenantApiKeys");
-
-            migrationBuilder.DropColumn(
-                name: "StoredPassword",
-                table: "Shops");
-
-            migrationBuilder.DropColumn(
-                name: "Pages",
-                table: "PrintLogs");
-
-            migrationBuilder.AlterColumn<int>(
-                name: "TenantId",
-                table: "SystemSettings",
-                type: "int",
-                nullable: false,
-                defaultValue: 0,
-                oldClrType: typeof(int),
-                oldType: "int",
-                oldNullable: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_SystemSettings_TenantId_Key",
