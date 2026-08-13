@@ -88,6 +88,7 @@ builder.Services.AddScoped<ISettingsService, SettingsService>();
 builder.Services.AddSingleton<PrintTokenService>();
 builder.Services.AddSingleton<IPdfSecurityService, PdfSecurityService>();
 builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
+builder.Services.AddScoped<IPrinterRegistrationService, PrinterRegistrationService>();
 builder.Services.AddScoped<SystemAdminService>();
 builder.Services.AddHttpContextAccessor();
 

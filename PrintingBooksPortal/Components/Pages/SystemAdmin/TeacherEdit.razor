@@ -152,13 +152,23 @@
                         {
                             <table class="table table-modern">
                                 <thead>
-                                    <tr><th>Prefix</th><th>Created</th><th>Status</th><th class="text-end"></th></tr>
+                                    <tr><th>Prefix</th><th>Bound To</th><th>Created</th><th>Status</th><th class="text-end"></th></tr>
                                 </thead>
                                 <tbody>
                                     @foreach (var k in apiKeys)
                                     {
                                         <tr>
                                             <td><code>@k.prefix…</code></td>
+                                            <td>
+                                                @if (k.shopId.HasValue)
+                                                {
+                                                    <span class="usage-pill"><span class="usage-dot usage-dot-primary"></span>@k.shopName</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">Tenant-wide</span>
+                                                }
+                                            </td>
                                             <td>@k.createdAt.ToEgyptLocal().ToString("g")</td>
                                             <td>
                                                 <span class="status-badge @(k.isActive ? "status-active" : "status-inactive")">

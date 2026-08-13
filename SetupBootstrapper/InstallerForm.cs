@@ -401,9 +401,9 @@ public class InstallerForm : Form
 
         var doneDesc = new Label
         {
-            Text = "has been installed successfully.\nThe agent is running and ready to receive print jobs.",
+            Text = "has been installed successfully.\nEnter your shop's API key when the setup screen opens,\nthen the agent will start sending this computer's printers to the portal.",
             Location = new Point(4, 94),
-            Size = new Size(cw - 8, 36),
+            Size = new Size(cw - 8, 54),
             ForeColor = ClrMuted
         };
 
@@ -535,6 +535,7 @@ public class InstallerForm : Form
             Process.Start(new ProcessStartInfo
             {
                 FileName = Path.Combine(installDir, "BookShopAgentUI.exe"),
+                Arguments = "--setup",   // open the API-key setup screen first — the shop enters its own key
                 WorkingDirectory = installDir,
                 WindowStyle = ProcessWindowStyle.Hidden,
                 CreateNoWindow = true

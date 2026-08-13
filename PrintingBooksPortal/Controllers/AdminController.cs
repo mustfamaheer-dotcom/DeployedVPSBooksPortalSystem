@@ -21,13 +21,87 @@ public class AdminController : ControllerBase
     private readonly FileStorageService _fileStorage;
     private readonly ITenantContext _tenantContext;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IApiKeyService _apiKeys;
 
-    public AdminController(AppDbContext db, FileStorageService fileStorage, ITenantContext tenantContext, UserManager<ApplicationUser> userManager)
+    public AdminController(AppDbContext db, FileStorageService fileStorage, ITenantContext tenantContext, UserManager<ApplicationUser> userManager, IApiKeyService apiKeys)
     {
         _db = db;
         _fileStorage = fileStorage;
         _tenantContext = tenantContext;
         _userManager = userManager;
+        _apiKeys = apiKeys;
+    }
+
+    // ── Shop API keys (one key per shop → one agent per bookshop device) ──
+
+    private async Task<Shop?> GetOwnedShopAsync(int shopId)
+    {
+        var shop = await _db.Shops.IgnoreQueryFilters().FirstOrDefaultAsync(s => s.Id == shopId);
+        if (shop == null)
+            return null;
+
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null)
+            return null;
+
+        var isSystemAdmin = await _userManager.IsInRoleAsync(user, "SystemAdmin");
+        if (!isSystemAdmin && user.TenantId.HasValue && shop.TenantId != user.TenantId.Value)
+            return null;
+
+        return shop;
+    }
+
+    [HttpGet("shops/{shopId:int}/apikeys")]
+    public async Task<IActionResult> ListShopApiKeys(int shopId)
+    {
+        var shop = await GetOwnedShopAsync(shopId);
+        if (shop == null)
+            return NotFound(new { error = "Shop not found." });
+
+        var keys = await _apiKeys.ListKeysAsync(shop.TenantId, shopId);
+        return Ok(new
+        {
+            apiKeys = keys.Select(k => new
+            {
+                k.Id,
+                k.KeyPrefix,
+                k.IsActive,
+                k.CreatedAt
+            })
+        });
+    }
+
+    [HttpPost("shops/{shopId:int}/apikeys")]
+    public async Task<IActionResult> CreateShopApiKey(int shopId)
+    {
+        var shop = await GetOwnedShopAsync(shopId);
+        if (shop == null)
+            return NotFound(new { error = "Shop not found." });
+
+        var plainKey = _apiKeys.GenerateKey(shop.TenantId, shopId);
+        return StatusCode(201, new
+        {
+            apiKey = plainKey,
+            prefix = plainKey[..12],
+            message = "This key is bound to this shop only. Store it now — it is shown only once."
+        });
+    }
+
+    [HttpPost("shops/{shopId:int}/apikeys/{keyId:int}/revoke")]
+    public async Task<IActionResult> RevokeShopApiKey(int shopId, int keyId)
+    {
+        var shop = await GetOwnedShopAsync(shopId);
+        if (shop == null)
+            return NotFound(new { error = "Shop not found." });
+
+        var key = await _db.TenantApiKeys
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(k => k.Id == keyId && k.TenantId == shop.TenantId && k.ShopId == shopId);
+        if (key == null)
+            return NotFound(new { error = "API key not found." });
+
+        await _apiKeys.RevokeKeyAsync(keyId);
+        return Ok(new { success = true });
     }
 
     [HttpPost("books/upload")]

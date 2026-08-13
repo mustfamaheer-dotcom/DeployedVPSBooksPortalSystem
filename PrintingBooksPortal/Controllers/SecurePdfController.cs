@@ -26,6 +26,7 @@ public class SecurePdfController : ControllerBase
     private readonly ILogger<SecurePdfController> _logger;
     private readonly IApiKeyService _apiKeys;
     private readonly ITenantContext _tenantContext;
+    private readonly IPrinterRegistrationService _printerRegistration;
 
     public SecurePdfController(
         AppDbContext db,
@@ -39,7 +40,8 @@ public class SecurePdfController : ControllerBase
         IConfiguration configuration,
         ILogger<SecurePdfController> logger,
         IApiKeyService apiKeys,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IPrinterRegistrationService printerRegistration)
     {
         _db = db;
         _fileStorage = fileStorage;
@@ -53,6 +55,7 @@ public class SecurePdfController : ControllerBase
         _logger = logger;
         _apiKeys = apiKeys;
         _tenantContext = tenantContext;
+        _printerRegistration = printerRegistration;
     }
 
     // ── auth helpers ──
@@ -180,7 +183,10 @@ public class SecurePdfController : ControllerBase
         // Accuracy gate: never queue a job for a printer the agent does not currently
         // detect — otherwise the job would silently fail or fall back to the wrong printer.
         // Skipped when the agent has not reported a printer list yet (cannot validate).
-        var printerCheck = AgentStatusTracker.HasPrinter(request.PrinterName, tenantId);
+        // Shop users are validated against THEIR OWN shop's agent only (unless the
+        // single-agent "ServeAllTenants" mode is enabled — then any agent's printers count).
+        var shopScope = ServeAllTenants ? (int?)null : user.ShopId;
+        var printerCheck = AgentStatusTracker.HasPrinter(request.PrinterName, tenantId, shopScope);
         if (printerCheck == false)
             return BadRequest(new
             {
@@ -457,7 +463,8 @@ public class SecurePdfController : ControllerBase
             return Unauthorized(new { error = "Valid API key required." });
 
         var tenantId = await _apiKeys.ResolveTenantAsync(key);
-        AgentStatusTracker.RecordHeartbeat(HashAgentKey(key), request?.Printers ?? new(), tenantId);
+        var shopId = await _apiKeys.ResolveShopAsync(key);     // 0 = tenant-wide key
+        AgentStatusTracker.RecordHeartbeat(HashAgentKey(key), request?.Printers ?? new(), tenantId, shopId);
         return Ok(new { success = true });
     }
 
@@ -465,16 +472,37 @@ public class SecurePdfController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> AgentStatus()
     {
-        // Show the printers of the agent(s) of the caller's own tenant — the website
-        // must list exactly what the shop's agent reads, never another agent's list.
+        // Show the printers of the caller's OWN agent(s) — the website must list
+        // exactly what the shop's agent reads right now, never another agent's list.
+        // A shop user sees only the agent(s) bound to their shop via the API key;
+        // a teacher/admin sees the whole tenant's agents.
         var tenantId = _tenantContext.TenantId;
+        int? shopId = null;
+
+        var appUser = await _userManager.GetUserAsync(User);
+        if (appUser != null)
+        {
+            if (appUser.TenantId.HasValue)
+                tenantId = appUser.TenantId.Value;
+            // Single-agent mode serves every shop from one device — no shop scoping.
+            if (!ServeAllTenants && appUser.ShopId.HasValue
+                && !await _userManager.IsInRoleAsync(appUser, "Teacher")
+                && !await _userManager.IsInRoleAsync(appUser, "SystemAdmin"))
+                shopId = appUser.ShopId.Value;
+        }
+
         if (tenantId <= 0)
         {
             var key = HttpContext.Request.Headers["X-Api-Key"].FirstOrDefault();
             if (!string.IsNullOrEmpty(key))
+            {
                 tenantId = await _apiKeys.ResolveTenantAsync(key);
+                shopId = await _apiKeys.ResolveShopAsync(key);
+                if (shopId == 0) shopId = null;
+            }
         }
-        return Ok(AgentStatusTracker.GetStatus(tenantId > 0 ? tenantId : null));
+
+        return Ok(AgentStatusTracker.GetStatus(tenantId > 0 ? tenantId : null, shopId));
     }
 
     private static string HashAgentKey(string key)
@@ -573,6 +601,72 @@ public class SecurePdfController : ControllerBase
         return Ok(new { success = true, message = "Job already in queue." });
     }
 
+    [HttpPost("print-agent/test")]
+    [AllowAnonymous]
+    public async Task<IActionResult> TestApiKey()
+    {
+        var key = HttpContext.Request.Headers["X-Api-Key"].FirstOrDefault();
+        var tenantId = !string.IsNullOrEmpty(key) ? await _apiKeys.ResolveTenantAsync(key) : 0;
+        
+        if (tenantId == 0)
+            return Unauthorized(new { error = "Invalid API key" });
+
+        var tenant = await _db.Tenants.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == tenantId);
+
+        return Ok(new { 
+            success = true, 
+            message = "API key is valid",
+            tenantId = tenantId,
+            tenantName = tenant?.Name ?? "Unknown"
+        });
+    }
+
+    [HttpPost("print-agent/register-printers")]
+    [AllowAnonymous]
+    public async Task<IActionResult> RegisterPrinters([FromBody] AgentHeartbeatRequest request)
+    {
+        var key = HttpContext.Request.Headers["X-Api-Key"].FirstOrDefault();
+        var tenantId = !string.IsNullOrEmpty(key) ? await _apiKeys.ResolveTenantAsync(key) : 0;
+        var shopId = !string.IsNullOrEmpty(key) ? await _apiKeys.ResolveShopAsync(key) : 0;
+
+        if (tenantId == 0)
+            return Unauthorized(new { error = "Valid API key required." });
+
+        int? shopScope = shopId == 0 ? null : shopId;   // 0 = tenant-wide key
+        await _printerRegistration.RegisterPrintersAsync(key, shopScope, request.Printers);
+
+        // Also update the in-memory tracker (authoritative source for the website)
+        AgentStatusTracker.RecordHeartbeat(HashAgentKey(key), request.Printers, tenantId, shopId);
+
+        return Ok(new { success = true, message = $"Registered {request.Printers.Count} printers" });
+    }
+
+    [HttpGet("printers")]
+    public async Task<IActionResult> GetTenantPrinters()
+    {
+        var tenantId = _tenantContext.TenantId;
+        if (tenantId <= 0)
+            return Unauthorized(new { error = "Invalid tenant context" });
+
+        var printers = await _printerRegistration.GetTenantPrintersAsync(tenantId);
+        
+        return Ok(new { 
+            printers = printers.Select(p => new {
+                name = p.Name,
+                port = p.Port,
+                connectionType = p.ConnectionType,
+                driver = p.Driver,
+                location = p.Location,
+                comment = p.Comment,
+                isDefault = p.IsDefault,
+                isOnline = p.IsOnline,
+                status = p.Status,
+                lastSeen = p.LastSeen
+            })
+        });
+    }
+
     private async Task<string> GetTenantNameAsync()
     {
         var tid = _tenantContext.TenantId;
@@ -657,6 +751,7 @@ public static class AgentStatusTracker
     private sealed class AgentState
     {
         public int TenantId;
+        public int ShopId;                       // 0 = tenant-wide agent (legacy key)
         public DateTime LastSeen = DateTime.MinValue;
         public List<AgentPrinterInfo> Printers = new();
     }
@@ -664,7 +759,7 @@ public static class AgentStatusTracker
     private static readonly Dictionary<string, AgentState> _agents = new(StringComparer.Ordinal);
     private static readonly object _lock = new();
 
-    public static void RecordHeartbeat(string agentKeyHash, List<AgentPrinterInfo> printers, int tenantId)
+    public static void RecordHeartbeat(string agentKeyHash, List<AgentPrinterInfo> printers, int tenantId, int shopId = 0)
     {
         lock (_lock)
         {
@@ -672,6 +767,7 @@ public static class AgentStatusTracker
             _agents[agentKeyHash] = new AgentState
             {
                 TenantId = tenantId,
+                ShopId = shopId,
                 LastSeen = now,
                 Printers = printers ?? new()
             };
@@ -680,8 +776,11 @@ public static class AgentStatusTracker
         }
     }
 
-    /// <summary>Latest heartbeat among the agents of the given tenant (or all agents when tenantId is null).</summary>
-    private static AgentState? Latest(int? tenantId)
+    /// <summary>
+    /// Latest heartbeat among the agents matching the given scope.
+    /// Shop users see only THEIR shop's agent; teachers see the whole tenant.
+    /// </summary>
+    private static AgentState? Latest(int? tenantId, int? shopId)
     {
         lock (_lock)
         {
@@ -690,15 +789,16 @@ public static class AgentStatusTracker
             foreach (var s in _agents.Values)
             {
                 if (tenantId.HasValue && s.TenantId != tenantId.Value) continue;
+                if (shopId.HasValue && s.ShopId != shopId.Value) continue;
                 if (s.LastSeen > bestSeen) { bestSeen = s.LastSeen; best = s; }
             }
             return best;
         }
     }
 
-    public static object GetStatus(int? tenantId)
+    public static object GetStatus(int? tenantId, int? shopId = null)
     {
-        var state = Latest(tenantId);
+        var state = Latest(tenantId, shopId);
         var ageSeconds = state == null ? double.MaxValue : (DateTime.UtcNow - state.LastSeen).TotalSeconds;
         return new
         {
@@ -706,18 +806,21 @@ public static class AgentStatusTracker
             stale = ageSeconds >= StaleAfterSeconds && ageSeconds < OfflineAfterSeconds,
             lastSeen = state == null ? (string?)null : state.LastSeen.ToString("O"),
             tenantId = state?.TenantId ?? 0,
+            shopId = state?.ShopId ?? 0,
             printers = state?.Printers ?? new List<AgentPrinterInfo>()
         };
     }
 
     /// <summary>
     /// Accuracy gate: checks a requested printer name against the CURRENT printers
-    /// reported by the agents of the caller's tenant. Returns true for empty names
+    /// reported by the agents of the caller's scope. Returns true for empty names
     /// (agent prints to default), false when the name is not read by any agent of
-    /// that tenant right now, and null when no agent has ever reported printers
+    /// that scope right now, and null when no agent has ever reported printers
     /// (nothing to validate against, e.g. right after a server restart).
+    /// Shop users are validated against THEIR OWN shop's agent only, so one shop
+    /// can never select a printer that belongs to another shop's device.
     /// </summary>
-    public static bool? HasPrinter(string? printerName, int? tenantId)
+    public static bool? HasPrinter(string? printerName, int? tenantId, int? shopId = null)
     {
         if (string.IsNullOrWhiteSpace(printerName))
             return true;
@@ -731,6 +834,7 @@ public static class AgentStatusTracker
             foreach (var s in _agents.Values)
             {
                 if (tenantId.HasValue && s.TenantId != tenantId.Value) continue;
+                if (shopId.HasValue && s.ShopId != shopId.Value) continue;
                 anyKnown = true;
                 if (s.Printers.Any(p =>
                     string.Equals(p.Name?.Trim(), printerName.Trim(), StringComparison.OrdinalIgnoreCase)))
@@ -748,6 +852,10 @@ public class AgentPrinterInfo
     public bool IsDefault { get; set; }
     public bool IsOnline { get; set; } = true;
     public string? Status { get; set; }
+    public string? Port { get; set; }
+    public string? Driver { get; set; }
+    public string? Location { get; set; }
+    public string? Comment { get; set; }
 }
 
 public class AgentHeartbeatRequest

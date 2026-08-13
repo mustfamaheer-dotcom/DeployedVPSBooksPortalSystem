@@ -89,7 +89,20 @@ var apiKey = app.Configuration.GetValue<string>("ServerSettings:ApiKey") ?? "";
 var defaultPrinter = app.Configuration.GetValue<string>("PrinterSettings:DefaultPrinterName") ?? "";
 Console.WriteLine($"[BookShopPrintAgent] Listening on http://localhost:8080");
 Console.WriteLine($"[BookShopPrintAgent] Server: {baseUrl}");
-Console.WriteLine($"[BookShopPrintAgent] API Key: {(string.IsNullOrEmpty(apiKey) ? "(none)" : apiKey[..12] + "...")}");
+if (string.IsNullOrEmpty(apiKey))
+{
+    Console.WriteLine($"[BookShopPrintAgent] NO API KEY CONFIGURED — printers will NOT be sent and jobs will NOT be received.");
+    Console.WriteLine($"[BookShopPrintAgent] Ask your teacher for your SHOP's API key, then open the tray icon → 'Setup Configuration' and enter it.");
+}
+else if (!apiKey.StartsWith("bpk_", StringComparison.OrdinalIgnoreCase))
+{
+    Console.WriteLine($"[BookShopPrintAgent] WARNING: API key does not look valid (must start with 'bpk_'). Check it in Setup Configuration.");
+    Console.WriteLine($"[BookShopPrintAgent] API Key: {apiKey[..Math.Min(12, apiKey.Length)]}...");
+}
+else
+{
+    Console.WriteLine($"[BookShopPrintAgent] API Key: {apiKey[..12]}...");
+}
 Console.WriteLine($"[BookShopPrintAgent] Agent dir: {agentDir}");
 Console.WriteLine($"[BookShopPrintAgent] Polling for jobs every 3 seconds...");
 
@@ -189,8 +202,11 @@ _ = Task.Run(async () =>
             Log($"Polling error: {ex.Message}");
         }
 
-        // Heartbeat: send printer list to server so the website can show agent status
-        try
+    // Heartbeat: send printer list to server so the website can show agent status.
+    // Skipped when no API key is configured — the server would reject it anyway.
+    try
+    {
+        if (!string.IsNullOrEmpty(apiKey))
         {
             using var localClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
             var printersResponse = await localClient.GetAsync("http://127.0.0.1:8080/api/print-job/printers");
@@ -198,13 +214,19 @@ _ = Task.Run(async () =>
             {
                 var printersJson = await printersResponse.Content.ReadAsStringAsync();
                 using var content = new StringContent(printersJson, System.Text.Encoding.UTF8, "application/json");
+
+                // Send heartbeat (for backward compatibility)
                 await client.PostAsync($"{baseUrl}/api/pdf/print-agent/heartbeat", content);
+
+                // Register printers in database
+                await client.PostAsync($"{baseUrl}/api/pdf/print-agent/register-printers", content);
             }
         }
-        catch (Exception ex)
-        {
-            Log($"Heartbeat failed: {ex.Message}");
-        }
+    }
+    catch (Exception ex)
+    {
+        Log($"Heartbeat failed: {ex.Message}");
+    }
 
         await Task.Delay(3000);
     }

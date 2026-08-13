@@ -14,7 +14,7 @@ static class Program
     private static DashboardForm? dashboard;
 
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
 
@@ -23,12 +23,19 @@ static class Program
 
         CreateTrayIcon();
 
+        // "Setup Configuration" first, right after installation (--setup from the installer):
+        // the bookshop enters its own API key before the agent starts heartbeating.
+        bool runSetup = args.Any(a => string.Equals(a, "--setup", StringComparison.OrdinalIgnoreCase));
+
         // Show dashboard immediately on launch
         ShowDashboard();
 
         // Start the agent if install dir exists
         if (Directory.Exists(agentDir))
             _ = StartAgentAsync();
+
+        if (runSetup)
+            ShowSetup();
 
         Application.Run();
     }
@@ -37,6 +44,8 @@ static class Program
     {
         trayMenu = new ContextMenuStrip();
         trayMenu.Items.Add("Open Dashboard", null, (_, _) => ShowDashboard());
+        trayMenu.Items.Add(new ToolStripSeparator());
+        trayMenu.Items.Add("Setup Configuration", null, (_, _) => ShowSetup());
         trayMenu.Items.Add(new ToolStripSeparator());
         trayMenu.Items.Add("Start Agent", null, async (_, _) => await StartAgentAsync());
         trayMenu.Items.Add("Stop Agent", null, (_, _) => StopAgent());
@@ -63,6 +72,23 @@ static class Program
         dashboard.Show();
         dashboard.Activate();
         _ = dashboard.RefreshStatusAsync();
+    }
+
+    private static void ShowSetup()
+    {
+        var setupForm = new SetupForm();
+        setupForm.ShowDialog();
+    }
+
+    /// <summary>Restarts the agent so a freshly saved API key takes effect immediately.</summary>
+    internal static void RestartAgentAfterConfigChange()
+    {
+        if (agentRunning)
+        {
+            StopAgent();
+            Thread.Sleep(800);
+            _ = StartAgentAsync();
+        }
     }
 
     internal static async Task StartAgentAsync()

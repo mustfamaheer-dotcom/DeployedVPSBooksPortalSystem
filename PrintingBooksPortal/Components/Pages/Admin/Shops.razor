@@ -10,6 +10,7 @@
 @inject IDataProtectionProvider DataProtection
 @inject UserManager<ApplicationUser> UserManager
 @inject IHttpContextAccessor HttpContextAccessor
+@inject IApiKeyService ApiKeys
 
 <div class="content-area">
     <div class="page-header">
@@ -28,6 +29,17 @@
     @if (!string.IsNullOrEmpty(message))
     {
         <div class="alert alert-modern alert-success">@message</div>
+    }
+    @if (!string.IsNullOrEmpty(newShopKey))
+    {
+        <div class="alert-modern alert alert-warning key-alert">
+            <div class="fw-semibold">API key for the new shop — give it to the shop owner now (shown only once):</div>
+            <div class="key-code-wrap">
+                <code class="key-code">@newShopKey</code>
+                <button class="btn btn-sm btn-outline-primary" @onclick="CopyNewShopKey">Copy</button>
+            </div>
+            <div class="form-hint mt-1">The bookshop enters this key while installing the print agent. The portal will then show exactly the printers that this shop's agent reads on its computer.</div>
+        </div>
     }
     @if (!string.IsNullOrEmpty(error))
     {
@@ -170,6 +182,77 @@
         </div>
     </div>
 
+    @* Shop API Key Modal *@
+    <div class="modal-overlay @(showKeyModal ? "show" : "")" @onclick="() => showKeyModal = false">
+        <div class="modal-container" @onclick:stopPropagation>
+            <div class="modal-header">
+                <h5 class="modal-title">API Key &mdash; @keyShop?.Name</h5>
+                <button type="button" class="modal-close" @onclick="() => showKeyModal = false">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info py-2 px-3 mb-3">
+                    <small>This key is unique to <strong>@keyShop?.Name</strong>. The bookshop enters it while installing the print agent, and the portal then shows only the printers that this shop's own agent reads on its computer &mdash; never another shop's devices.</small>
+                </div>
+
+                @if (!string.IsNullOrEmpty(generatedKey))
+                {
+                    <div class="alert-modern alert alert-warning key-alert">
+                        <div class="fw-semibold">Store this key now — it is shown only once:</div>
+                        <div class="key-code-wrap">
+                            <code class="key-code">@generatedKey</code>
+                            <button class="btn btn-sm btn-outline-primary" @onclick="CopyGeneratedKey">Copy</button>
+                        </div>
+                    </div>
+                }
+
+                @if (shopKeys == null)
+                {
+                    <div class="loading-placeholder">Loading...</div>
+                }
+                else if (!shopKeys.Any())
+                {
+                    <div class="empty-state"><p>No API key for this shop yet. Generate one and give it to the shop owner.</p></div>
+                }
+                else
+                {
+                    <table class="table table-modern">
+                        <thead>
+                            <tr><th>Prefix</th><th>Created</th><th>Status</th><th class="text-end"></th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var k in shopKeys)
+                            {
+                                <tr>
+                                    <td><code>@k.KeyPrefix…</code></td>
+                                    <td>@k.CreatedAt.ToEgyptLocal().ToString("g")</td>
+                                    <td>
+                                        <span class="status-badge @(k.IsActive ? "status-active" : "status-inactive")">
+                                            <span class="status-dot"></span>
+                                            @(k.IsActive ? "Active" : "Revoked")
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        @if (k.IsActive)
+                                        {
+                                            <button class="btn btn-sm btn-outline-danger" @onclick="() => RevokeKey(k.Id)">Revoke</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    <div class="form-hint">Revoking a key disconnects the agent using it. The shop's devices will stop receiving print jobs.</div>
+                }
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-outline-secondary" @onclick="() => showKeyModal = false">Close</button>
+                <button class="btn btn-primary" @onclick="GenerateShopKey" disabled="@(keyBusy)">@(keyBusy ? "Generating..." : "Generate New Key")</button>
+            </div>
+        </div>
+    </div>
+
     @* View Credentials Modal *@
     <div class="modal-overlay @(showCredModal ? "show" : "")" @onclick="() => showCredModal = false">
         <div class="modal-container modal-sm" @onclick:stopPropagation>
@@ -302,6 +385,9 @@
                                             <button class="btn-icon btn-icon-key" title="Change Password" @onclick="() => OpenPassword(shop)">
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
                                             </button>
+                                            <button class="btn-icon btn-icon-api" title="API Key (print agent)" @onclick="() => OpenKeyModal(shop)">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                                            </button>
                                             <button class="btn-icon btn-icon-receipt" title="Receipt PDF" @onclick="() => DownloadReceipt(shop.Id)">
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                                             </button>
@@ -351,6 +437,13 @@
     private string? credPassword;
     private string copied = "";
 
+    private bool showKeyModal;
+    private Shop? keyShop;
+    private List<TenantApiKey>? shopKeys;
+    private string? generatedKey;
+    private bool keyBusy;
+    private string? newShopKey;
+
     private IDataProtector? _protector;
 
     protected override async Task OnInitializedAsync()
@@ -368,6 +461,76 @@
         shopLogins = users
             .GroupBy(u => u.ShopId!.Value)
             .ToDictionary(g => g.Key, g => g.First().Email ?? g.First().UserName ?? "");
+    }
+
+    private async Task CopyGeneratedKey()
+    {
+        if (string.IsNullOrEmpty(generatedKey)) return;
+        await JS.InvokeVoidAsync("copyToClipboard", generatedKey);
+    }
+
+    private async Task CopyNewShopKey()
+    {
+        if (string.IsNullOrEmpty(newShopKey)) return;
+        await JS.InvokeVoidAsync("copyToClipboard", newShopKey);
+    }
+
+    private async Task OpenKeyModal(Shop shop)
+    {
+        keyShop = shop;
+        generatedKey = null;
+        shopKeys = null;
+        showKeyModal = true;
+        await LoadShopKeys();
+    }
+
+    private async Task LoadShopKeys()
+    {
+        if (keyShop == null) return;
+        var tenantId = keyShop.TenantId > 0 ? keyShop.TenantId : TenantContext.TenantId;
+        if (tenantId <= 0) return;
+        shopKeys = await ApiKeys.ListKeysAsync(tenantId, keyShop.Id);
+    }
+
+    private async Task GenerateShopKey()
+    {
+        if (keyShop == null) return;
+        keyBusy = true;
+        try
+        {
+            var tenantId = keyShop.TenantId > 0 ? keyShop.TenantId : TenantContext.TenantId;
+            if (tenantId <= 0)
+            {
+                error = "Could not resolve the tenant for this shop.";
+                return;
+            }
+            generatedKey = ApiKeys.GenerateKey(tenantId, keyShop.Id);
+            await LoadShopKeys();
+            await JS.InvokeVoidAsync("showToast", $"API key generated for '{keyShop.Name}'.", "success");
+        }
+        catch (Exception ex)
+        {
+            error = $"Key generation failed: {ex.Message}";
+            await JS.InvokeVoidAsync("showToast", error, "error");
+        }
+        finally
+        {
+            keyBusy = false;
+        }
+    }
+
+    private async Task RevokeKey(int keyId)
+    {
+        try
+        {
+            await ApiKeys.RevokeKeyAsync(keyId);
+            await LoadShopKeys();
+            await JS.InvokeVoidAsync("showToast", "API key revoked. The agent using it is now disconnected.", "success");
+        }
+        catch (Exception ex)
+        {
+            error = $"Revoke failed: {ex.Message}";
+        }
     }
 
     private void EditShop(Shop shop)
@@ -486,6 +649,10 @@
                 Phone = editModel.Phone,
                 StoredPassword = _protector?.Protect(editModel.Password)
             };
+            // SystemAdmin has no tenant claim — fall back to the first active tenant.
+            var tenantId = TenantContext.TenantId > 0 ? TenantContext.TenantId
+                : await Db.Tenants.Where(t => t.IsActive).OrderBy(t => t.Id).Select(t => (int?)t.Id).FirstOrDefaultAsync() ?? 0;
+            shop.TenantId = tenantId;
             Db.Shops.Add(shop);
             await Db.SaveChangesAsync();
 
@@ -495,7 +662,7 @@
                 Email = editModel.Email,
                 FullName = editModel.Name,
                 ShopId = shop.Id,
-                TenantId = TenantContext.TenantId,
+                TenantId = tenantId,
                 EmailConfirmed = true
             };
 
@@ -503,7 +670,18 @@
             if (result.Succeeded)
             {
                 await UserManager.AddToRoleAsync(user, "Shop");
-                message = $"Shop '{shop.Name}' created with login: {editModel.Email} and password: {editModel.Password} (store it securely — it cannot be shown again later).";
+                // Every shop gets its own API key — the print agent installed on the
+                // shop's computer uses it, so the portal shows only that shop's printers.
+                try
+                {
+                    newShopKey = ApiKeys.GenerateKey(shop.TenantId, shop.Id);
+                    message = $"Shop '{shop.Name}' created with login: {editModel.Email}.";
+                }
+                catch
+                {
+                    newShopKey = null;
+                    message = $"Shop '{shop.Name}' created with login: {editModel.Email}. (API key generation failed — generate one from the API Key button.)";
+                }
             }
             else
             {

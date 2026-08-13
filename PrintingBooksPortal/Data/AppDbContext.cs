@@ -25,6 +25,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<ShopBookAssignment> ShopBookAssignments => Set<ShopBookAssignment>();
     public DbSet<PrintLog> PrintLogs => Set<PrintLog>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+    public DbSet<RegisteredPrinter> RegisteredPrinters => Set<RegisteredPrinter>();
 
     // ── Tenant scoping on writes ──
     // Interactive circuits have no HttpContext; the tenant id is resolved from
@@ -33,7 +34,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     private static readonly HashSet<string> TenantScopedTypes = new()
     {
         nameof(Shop), nameof(EducationalBoard), nameof(Book),
-        nameof(ShopBookAssignment), nameof(PrintLog), nameof(SystemSetting)
+        nameof(ShopBookAssignment), nameof(PrintLog), nameof(SystemSetting), nameof(RegisteredPrinter)
     };
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -100,6 +101,9 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<TenantApiKey>()
             .HasIndex(k => k.TenantId);
 
+        builder.Entity<TenantApiKey>()
+            .HasIndex(k => k.ShopId);
+
         builder.Entity<PrintLog>()
             .HasIndex(l => l.TenantId);
 
@@ -125,6 +129,23 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
             .HasOne(u => u.Tenant).WithMany(t => t.Users)
             .HasForeignKey(u => u.TenantId).OnDelete(DeleteBehavior.Restrict);
 
+        // ── RegisteredPrinter configuration ──
+        builder.Entity<RegisteredPrinter>()
+            .HasIndex(p => new { p.TenantId, p.ShopId, p.AgentKeyHash, p.Name })
+            .IsUnique();
+
+        builder.Entity<RegisteredPrinter>()
+            .HasIndex(p => p.TenantId);
+
+        builder.Entity<RegisteredPrinter>()
+            .HasIndex(p => p.ShopId);
+
+        builder.Entity<RegisteredPrinter>()
+            .HasIndex(p => p.AgentKeyHash);
+
+        builder.Entity<RegisteredPrinter>()
+            .HasIndex(p => p.LastSeen);
+
         // ── global query filters (multi-tenancy on) ──
         // SystemAdmin (no TenantId) sees ALL tenants; regular users see only
         // their own (fail-closed: unauthenticated → TenantId 0 → nothing).
@@ -136,6 +157,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
             builder.Entity<ShopBookAssignment>().HasQueryFilter(e => e.TenantId == _tenantContext.TenantId || _tenantContext.IsSystemAdmin);
             builder.Entity<PrintLog>().HasQueryFilter(e => e.TenantId == _tenantContext.TenantId || _tenantContext.IsSystemAdmin);
             builder.Entity<SystemSetting>().HasQueryFilter(e => e.TenantId == _tenantContext.TenantId || _tenantContext.IsSystemAdmin);
+            builder.Entity<RegisteredPrinter>().HasQueryFilter(e => e.TenantId == _tenantContext.TenantId || _tenantContext.IsSystemAdmin);
         }
     }
 }

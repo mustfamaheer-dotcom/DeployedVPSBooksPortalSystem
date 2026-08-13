@@ -105,6 +105,8 @@ public class SaKeyRow
     public string prefix { get; set; } = string.Empty;
     public bool isActive { get; set; }
     public DateTime createdAt { get; set; }
+    public int? shopId { get; set; }
+    public string shopName { get; set; } = string.Empty;
 }
 
 public class PlatformSummary
@@ -452,7 +454,9 @@ public class SystemAdminService
                 Id = k.Id,
                 prefix = k.KeyPrefix,
                 isActive = k.IsActive,
-                createdAt = k.CreatedAt
+                createdAt = k.CreatedAt,
+                shopId = k.ShopId,
+                shopName = k.Shop != null ? k.Shop.Name : ""
             })
             .ToListAsync();
 
@@ -491,7 +495,9 @@ public class SystemAdminService
                 Id = k.Id,
                 prefix = k.KeyPrefix,
                 isActive = k.IsActive,
-                createdAt = k.CreatedAt
+                createdAt = k.CreatedAt,
+                shopId = k.ShopId,
+                shopName = k.Shop != null ? k.Shop.Name : ""
             })
             .ToListAsync();
     }
