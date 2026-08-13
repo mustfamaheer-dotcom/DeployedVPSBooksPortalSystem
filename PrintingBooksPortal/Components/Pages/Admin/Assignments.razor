@@ -52,7 +52,7 @@
                                 {
                                     @foreach (var book in books.OrderBy(b => b.Title))
                                     {
-                                        var isAssigned = assignedBooks.ContainsKey($"{shop.Id}-{book.Id}");
+                                        var isAssigned = assignedBooks.TryGetValue($"{shop.Id}-{book.Id}", out var assignedVal) && assignedVal;
                                         var bookActive = book.IsActive;
                                         var statusClass = !bookActive ? "status-inactive" : (isAssigned ? "status-active" : "status-unassigned");
                                         var statusText = !bookActive ? "Inactive" : (isAssigned ? "Assigned" : "Unassigned");
@@ -140,8 +140,10 @@
             Db.ShopBookAssignments.Remove(existing);
         }
 
-        await Db.SaveChangesAsync();
+        // Flip the UI immediately (optimistic) — no refresh needed.
         assignedBooks[$"{shopId}-{bookId}"] = assigned;
         message = assigned ? "Book assigned." : "Book unassigned.";
+
+        await Db.SaveChangesAsync();
     }
 }
