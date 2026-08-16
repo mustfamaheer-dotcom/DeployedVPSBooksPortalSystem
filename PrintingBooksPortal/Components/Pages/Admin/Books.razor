@@ -30,6 +30,26 @@
         <div class="alert alert-modern alert-danger">@error</div>
     }
 
+    @if (uploadActive && (uploadKind == "edit" ? !showEditModal : !showUpload))
+    {
+        <div class="upload-card mb-4">
+            <div class="upload-card-header">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="loading-spinner me-1"></span>
+                    <h5 class="mb-0">Uploading '@uploadTitle'…</h5>
+                </div>
+            </div>
+            <div class="upload-card-body">
+                <div class="upload-progress">
+                    <div class="upload-progress-bar">
+                        <div class="upload-progress-fill" style="width:@(uploadProgress)%"></div>
+                    </div>
+                    <span class="upload-progress-text">@uploadProgress%</span>
+                </div>
+            </div>
+        </div>
+    }
+
     @if (showUpload)
     {
         <div class="upload-card mb-4">
@@ -255,6 +275,9 @@
     private Book? editingBook;
     private bool pendingEdit;
     private int uploadProgress;
+    private bool uploadActive;
+    private string? uploadTitle;
+    private string uploadKind = "upload";
     private string? message;
     private string? error;
     private IJSObjectReference? booksModule;
@@ -267,15 +290,19 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        // On first render, always wire the module and restore any upload that is
+        // still running (or already finished) from a previous visit to this page.
+        if (firstRender)
+        {
+            await EnsureModule();
+            await RestoreUploadState();
+        }
         // Wire drag-and-drop onto the drop zones once their UI is visible.
-        if (showUpload || showEditModal)
+        else if (showUpload || showEditModal)
         {
             if (booksModule == null)
             {
-                booksModule = await JS.InvokeAsync<IJSObjectReference>("import",
-                    "./Components/Pages/Admin/Books.razor.js");
-                dotNetRef ??= DotNetObjectReference.Create(this);
-                await booksModule.InvokeVoidAsync("init", dotNetRef);
+                await EnsureModule();
             }
             else
             {
@@ -297,6 +324,9 @@
 
     private async Task LoadData()
     {
+        // Clear tracked entities so the list always reflects the latest DB state
+        // (the edit/upload API writes through its own request-scoped context).
+        Db.ChangeTracker.Clear();
         boards = await Db.EducationalBoards.Where(b => b.IsActive).ToListAsync<EducationalBoard>();
         books = await Db.Books.Include(b => b.Board).OrderByDescending(b => b.CreatedAt).ToListAsync<Book>();
     }
@@ -329,6 +359,9 @@
         loading = true;
         uploadProgress = 0;
         pendingEdit = false;
+        uploadKind = "upload";
+        uploadActive = true;
+        uploadTitle = uploadModel.Title;
         await EnsureModule();
         await booksModule!.InvokeVoidAsync("uploadNewBook");
     }
@@ -345,6 +378,9 @@
         loading = true;
         uploadProgress = 0;
         pendingEdit = true;
+        uploadKind = "edit";
+        uploadActive = true;
+        uploadTitle = editModel.Title;
         await EnsureModule();
         await booksModule!.InvokeVoidAsync("updateBook", editingBook!.Id);
     }
@@ -359,9 +395,6 @@
     [JSInvokable]
     public async Task OnUploadComplete(string json)
     {
-        loading = false;
-        uploadProgress = 0;
-
         UploadResult? result = null;
         try
         {
@@ -372,6 +405,17 @@
         {
             // Malformed payload — fall through to the generic error below.
         }
+
+        await HandleUploadResult(result);
+        StateHasChanged();
+    }
+
+    private async Task HandleUploadResult(UploadResult? result)
+    {
+        loading = false;
+        uploadProgress = 0;
+        uploadActive = false;
+        uploadTitle = null;
 
         if (result?.Success == true)
         {
@@ -395,14 +439,61 @@
         {
             error = result?.Error ?? "Upload failed.";
         }
+    }
 
+    private async Task RestoreUploadState()
+    {
+        if (booksModule == null) return;
+
+        string json;
+        try
+        {
+            json = await booksModule.InvokeAsync<string>("getState") ?? "";
+        }
+        catch
+        {
+            return;
+        }
+        if (string.IsNullOrEmpty(json)) return;
+
+        UploadStateDto? state = null;
+        try
+        {
+            state = JsonSerializer.Deserialize<UploadStateDto>(json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch
+        {
+            return;
+        }
+        if (state == null) return;
+
+        if (state.Active)
+        {
+            uploadActive = true;
+            loading = true;
+            uploadProgress = state.Percent;
+            uploadTitle = state.Title;
+            uploadKind = string.IsNullOrEmpty(state.Kind) ? "upload" : state.Kind;
+        }
+        if (state.Result != null)
+        {
+            await HandleUploadResult(state.Result);
+        }
         StateHasChanged();
     }
 
     private async Task ConfirmDelete()
     {
         if (deletingBook == null) return;
-        Db.Books.Remove(deletingBook);
+        var book = await Db.Books.FirstOrDefaultAsync(b => b.Id == deletingBook.Id);
+        if (book == null)
+        {
+            showDeleteModal = false;
+            deletingBook = null;
+            return;
+        }
+        Db.Books.Remove(book);
         await Db.SaveChangesAsync();
         FileStorage.DeleteFile(deletingBook.FilePath);
         await LoadData();
@@ -446,5 +537,14 @@
         public bool Success { get; set; }
         public string? Message { get; set; }
         public string? Error { get; set; }
+    }
+
+    private class UploadStateDto
+    {
+        public bool Active { get; set; }
+        public string Kind { get; set; } = "";
+        public int Percent { get; set; }
+        public string Title { get; set; } = "";
+        public UploadResult? Result { get; set; }
     }
 }

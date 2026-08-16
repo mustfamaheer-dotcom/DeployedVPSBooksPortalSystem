@@ -1,5 +1,13 @@
 let dotNetRef = null;
 let pdfjsLib = null;
+let uploadState = { active: false, kind: 'upload', percent: 0, title: '', result: null };
+
+function safeInvoke(method, arg) {
+    if (!dotNetRef) return;
+    try {
+        dotNetRef.invokeMethodAsync(method, arg).catch(() => { });
+    } catch (e) { }
+}
 
 function loadPdfJs() {
     return new Promise((resolve, reject) => {
@@ -78,7 +86,18 @@ function updateLabel(input, labelId) {
 }
 
 function notify(error) {
-    dotNetRef?.invokeMethodAsync('OnUploadComplete', JSON.stringify({ success: false, error }));
+    safeInvoke('OnUploadComplete', JSON.stringify({ success: false, error }));
+}
+
+function restore() {
+    if (!uploadState.active) return;
+    const prefix = uploadState.kind === 'edit' ? 'editProgress' : 'uploadProgress';
+    const wrap = document.getElementById(prefix + 'Wrap');
+    const bar = document.getElementById(prefix + 'Bar');
+    const text = document.getElementById(prefix + 'Text');
+    if (wrap) wrap.style.display = 'flex';
+    if (bar) bar.style.width = uploadState.percent + '%';
+    if (text) text.textContent = uploadState.percent + '%';
 }
 
 export function init(ref) {
@@ -89,6 +108,19 @@ export function init(ref) {
 export function refresh() {
     wireDropZone('pdfDropZone', 'pdfUpload', 'uploadFileName', 'uploadPagesHint');
     wireDropZone('editPdfDropZone', 'editPdfUpload', 'editFileName', 'editPagesHint');
+    restore();
+}
+
+export function getState() {
+    const s = {
+        active: uploadState.active,
+        kind: uploadState.kind,
+        percent: uploadState.percent,
+        title: uploadState.title,
+        result: uploadState.result
+    };
+    uploadState.result = null;
+    return JSON.stringify(s);
 }
 
 export function uploadNewBook() {
@@ -110,7 +142,7 @@ export function uploadNewBook() {
     fd.append('IsActive', 'true');
     fd.append('file', file);
 
-    doUpload(fd, 'uploadProgress');
+    doUpload(fd, 'uploadProgress', 'upload');
 }
 
 export function updateBook(bookId) {
@@ -129,10 +161,23 @@ export function updateBook(bookId) {
         fd.append('file', file);
     }
 
-    doUpload(fd, 'editProgress');
+    doUpload(fd, 'editProgress', 'edit');
 }
 
-function doUpload(fd, progressId) {
+function doUpload(fd, progressId, kind) {
+    if (uploadState.active) {
+        notify('An upload is already in progress.');
+        return;
+    }
+
+    uploadState = {
+        active: true,
+        kind: kind || 'upload',
+        percent: 0,
+        title: fd.get('Title') || '',
+        result: null
+    };
+
     const wrap = document.getElementById(progressId + 'Wrap');
     const bar = document.getElementById(progressId + 'Bar');
     const text = document.getElementById(progressId + 'Text');
@@ -145,9 +190,10 @@ function doUpload(fd, progressId) {
     xhr.upload.onprogress = (e) => {
         if (!e.lengthComputable) return;
         const pct = Math.round((e.loaded / e.total) * 100);
+        uploadState.percent = pct;
         if (bar) bar.style.width = pct + '%';
         if (text) text.textContent = pct + '%';
-        dotNetRef?.invokeMethodAsync('OnUploadProgress', pct);
+        safeInvoke('OnUploadProgress', pct);
     };
     xhr.onload = () => {
         let data = { success: false, error: 'Upload failed (server error).' };
@@ -158,13 +204,18 @@ function doUpload(fd, progressId) {
             else if (xhr.status >= 500) data.error = 'Server error (' + xhr.status + '). Please try again.';
         }
         if (xhr.status >= 200 && xhr.status < 300 && data.success) {
+            uploadState.percent = 100;
             if (bar) bar.style.width = '100%';
             if (text) text.textContent = '100%';
         }
-        dotNetRef?.invokeMethodAsync('OnUploadComplete', JSON.stringify(data));
+        uploadState.active = false;
+        uploadState.result = data;
+        safeInvoke('OnUploadComplete', JSON.stringify(data));
     };
     xhr.onerror = () => {
-        dotNetRef?.invokeMethodAsync('OnUploadComplete', JSON.stringify({ success: false, error: 'Network error during upload.' }));
+        uploadState.active = false;
+        uploadState.result = { success: false, error: 'Network error during upload.' };
+        safeInvoke('OnUploadComplete', JSON.stringify(uploadState.result));
     };
     xhr.send(fd);
 }
