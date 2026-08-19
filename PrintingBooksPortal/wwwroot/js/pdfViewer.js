@@ -646,40 +646,43 @@
         document.head.appendChild(script);
     }
 
+    function friendlyPdfError(message) {
+        var msg = String(message || '');
+        var statusMatch = msg.match(/Unexpected server response \((\d+)\)/);
+        var status = statusMatch ? parseInt(statusMatch[1], 10) : 0;
+        if (status === 401 || status === 403) return 'Access Denied: You are not authorized to view this book.';
+        if (status === 404) return 'This book is not available. It may have been removed or you no longer have access.';
+        if (status === 413) return 'This book is too large to view online. Please contact the administrator.';
+        if (status === 500) return 'The server could not process this book right now. Please try again or contact the administrator.';
+        if (msg.indexOf('PasswordException') !== -1) return 'This PDF is password protected and cannot be opened.';
+        if (msg.indexOf('InvalidPDFException') !== -1) return 'This file is not a valid PDF.';
+        return 'Could not load this book. Please refresh the page or contact the administrator.';
+    }
+
     async function loadSecurePdf(bookId) {
         loadingEl.style.display = 'flex';
 
         try {
-            var response = await fetch('/api/pdf/view-secure/' + bookId, {
-                method: 'GET',
-                credentials: 'include'
+            // Stream the watermarked PDF with HTTP Range requests: pdf.js fetches only the
+            // pages it needs, so even very large scanned books load quickly and stay light.
+            var loadingTask = pdfjsLib.getDocument({
+                url: '/api/pdf/view-secure/' + bookId,
+                withCredentials: true,
+                rangeChunkSize: 1048576,
+                disableAutoFetch: true
             });
 
-            if (response.status === 401 || response.status === 403) {
-                throw new Error('Access Denied: You are not authorized to view this book.');
-            }
-
-            if (!response.ok) {
-                throw new Error('HTTP Error: ' + response.status);
-            }
-
-            var data = await response.json();
-
-            var binaryString = atob(data.pdfData);
-            var len = binaryString.length;
-            var bytes = new Uint8Array(len);
-            for (var i = 0; i < len; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-            }
-
-            var loadingTask = pdfjsLib.getDocument({ data: bytes });
-
             loadingTask.onProgress = function (progress) {
-                var pct = Math.min(Math.round((progress.loaded / progress.total) * 100), 100);
+                var total = progress.total || 0;
                 var text = loadingEl.querySelector('.pdf-loading-text');
                 var bar = loadingEl.querySelector('.pdf-loading-bar span');
-                if (text) text.textContent = 'Loading... ' + pct + '%';
-                if (bar) bar.style.width = pct + '%';
+                if (total > 0) {
+                    var pct = Math.min(Math.round((progress.loaded / total) * 100), 100);
+                    if (text) text.textContent = 'Loading... ' + pct + '%';
+                    if (bar) bar.style.width = pct + '%';
+                } else {
+                    if (text) text.textContent = 'Loading document...';
+                }
             };
 
             pdfDoc = await loadingTask.promise;
@@ -709,7 +712,7 @@
 
         } catch (error) {
             console.error(error);
-            if (loadingEl) loadingEl.innerText = error.message;
+            if (loadingEl) loadingEl.innerText = friendlyPdfError(error && error.message);
         }
     }
 

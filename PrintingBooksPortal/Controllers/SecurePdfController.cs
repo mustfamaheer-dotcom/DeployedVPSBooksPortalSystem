@@ -136,17 +136,50 @@ public class SecurePdfController : ControllerBase
         if (!System.IO.File.Exists(viewFilePath))
             return NotFound(new { error = "The book file is missing on the server. Please contact the administrator to re-upload it." });
 
+        // Size guard: refuse to attempt processing pathologically large files (fail closed,
+        // no partial/wrong output). Books up to this limit are streamed page-by-page via
+        // HTTP Range requests, so even very large scanned books remain viewable.
+        const long maxViewBytes = 512L * 1024 * 1024;
+        if (new System.IO.FileInfo(viewFilePath).Length > maxViewBytes)
+            return StatusCode(413, new { error = "This book is too large to view online. Please contact the administrator." });
+
         try
         {
-            var tenant = await GetTenantNameAsync();
-            var originalBytes = await System.IO.File.ReadAllBytesAsync(viewFilePath);
-            var watermarkEnabled = await _settingsService.IsWatermarkEnabledAsync();
-            var watermarkText = await _settingsService.GetWatermarkTextAsync();
-            var watermarked = _watermarkService.ApplyWatermarkWithTenant(originalBytes, tenant, shopName, user.UserName ?? "Unknown", DateTime.UtcNow, watermarkEnabled, watermarkText);
-            return Ok(new { pdfData = Convert.ToBase64String(watermarked), watermarkEnabled });
+            var tenantName = await GetTenantNameAsync();
+            var userName = user.UserName ?? "Unknown";
+            var tenantId = user.TenantId ?? _tenantContext.TenantId;
+            var dayKey = DateTime.UtcNow.ToString("yyyyMMdd");
+
+            // Watermarked view copies are cached per book+shop+user+day (the watermark text
+            // embeds shop, user and date). Without a cache, pdf.js issues many Range requests
+            // and each one would re-watermark the whole file. Generating once per day per user
+            // makes large books usable; stale entries are pruned lazily on the next hit.
+            var cacheDir = ViewCachePath.GetViewDir(tenantId);
+            Directory.CreateDirectory(cacheDir);
+            var cacheFile = Path.Combine(cacheDir, $"{bookId}_{user.ShopId?.ToString() ?? "n"}_{user.Id}_{dayKey}.pdf");
+
+            if (!System.IO.File.Exists(cacheFile))
+            {
+                ViewCachePath.PruneStaleViews(cacheDir, dayKey);
+
+                var originalBytes = await System.IO.File.ReadAllBytesAsync(viewFilePath);
+                var watermarkEnabled = await _settingsService.IsWatermarkEnabledAsync();
+                var watermarkText = await _settingsService.GetWatermarkTextAsync();
+                var watermarked = _watermarkService.ApplyWatermarkWithTenant(originalBytes, tenantName, shopName, userName, DateTime.UtcNow, watermarkEnabled, watermarkText);
+
+                // Atomic write (temp + rename) so concurrent viewers never see a partial file.
+                var tmp = cacheFile + ".tmp";
+                await System.IO.File.WriteAllBytesAsync(tmp, watermarked);
+                System.IO.File.Move(tmp, cacheFile, overwrite: true);
+            }
+
+            _logger.LogInformation("User {UserId} served secure PDF for book {BookId} from {CacheFile}", user.Id, bookId, cacheFile);
+            // enableRangeProcessing lets pdf.js fetch only the pages it needs (huge files OK).
+            return File(new FileStream(cacheFile, FileMode.Open, FileAccess.Read, FileShare.Read), "application/pdf", enableRangeProcessing: true);
         }
         catch (Exception ex)
         {
+            // Security: fail CLOSED — never expose the unwatermarked file
             _logger.LogError(ex, "Heavy watermarking failed for book {BookId}", bookId);
             return StatusCode(500, new { error = "Failed to process PDF for viewing." });
         }
@@ -713,6 +746,36 @@ public static class SecurePrintsPath
 {
     public static string GetSecureDir(int tenantId)
         => Path.Combine(Directory.GetCurrentDirectory(), "SecurePrints", tenantId.ToString());
+}
+
+public static class ViewCachePath
+{
+    /// <summary>Per-tenant folder holding watermarked view copies (inside the App_Data volume).</summary>
+    public static string GetViewDir(int tenantId)
+        => Path.Combine(Directory.GetCurrentDirectory(), "App_Data", "ViewCache", tenantId.ToString());
+
+    /// <summary>
+    /// Best-effort cleanup of stale view-cache entries (other days' files and leftover .tmp
+    /// files from interrupted writes). The directory is dedicated to view-cache files, so any
+    /// file not carrying today's day key is stale.
+    /// </summary>
+    public static void PruneStaleViews(string cacheDir, string keepDayKey)
+    {
+        try
+        {
+            if (!Directory.Exists(cacheDir)) return;
+            foreach (var file in Directory.GetFiles(cacheDir))
+            {
+                var name = Path.GetFileName(file);
+                if (name.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)
+                    || !name.Contains(keepDayKey, StringComparison.Ordinal))
+                {
+                    try { System.IO.File.Delete(file); } catch { /* best-effort */ }
+                }
+            }
+        }
+        catch { /* best-effort */ }
+    }
 }
 
 public class ProcessPrintRequest
