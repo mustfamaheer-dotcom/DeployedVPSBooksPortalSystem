@@ -69,8 +69,8 @@
                                 <small class="text-muted text-nowrap ms-2">p.@p.LastPageRead / @(p.TotalPages > 0 ? p.TotalPages : p.LastPageRead)</small>
                             </div>
                             <div class="d-flex w-100 align-items-center mt-2">
-                                <div class="progress flex-grow-1 me-3" style="height: 4px;">
-                                    <div class="progress-bar bg-primary" style="width: @(percent)%;"></div>
+                                <div class="progress flex-grow-1 me-3" style="height: 4px; background-color: #e9ecef;">
+                                    <div class="progress-bar" style="width: @(percent)%; background-color: #0d6efd !important;"></div>
                                 </div>
                                 <span class="badge bg-light text-dark border flex-shrink-0">@p.Tenant.Name</span>
                             </div>
