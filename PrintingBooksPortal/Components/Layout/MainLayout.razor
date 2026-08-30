@@ -1,4 +1,4 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 @inject NavigationManager Navigation
 @inject SignInManager<ApplicationUser> SignInManager
 @inject UserManager<ApplicationUser> UserManager
@@ -10,6 +10,7 @@
 <div class="app-layout">
     @if (showSidebar)
     {
+        <div class="sidebar-overlay d-lg-none" @onclick="ToggleSidebar"></div>
         <aside class="app-sidebar" id="appSidebar">
             <NavMenu />
         </aside>

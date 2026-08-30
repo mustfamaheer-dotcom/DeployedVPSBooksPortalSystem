@@ -7,15 +7,15 @@
 @inject IJSRuntime JS
 
 <div class="student-viewer-layout">
-    <div class="viewer-header d-flex justify-content-between align-items-center px-4 py-3 bg-white border-bottom shadow-sm">
+    <div class="viewer-header d-flex flex-wrap justify-content-between align-items-center px-3 px-md-4 py-3 bg-white border-bottom shadow-sm gap-3">
         <div class="d-flex align-items-center">
             <button class="btn btn-light btn-sm me-3" @onclick="GoBack">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
-            <h5 class="mb-0 fw-semibold text-truncate" style="max-width: 400px;">@bookTitle</h5>
+            <h5 class="mb-0 fw-semibold text-truncate" style="max-width: 300px;">@bookTitle</h5>
         </div>
         
-        <div class="annotation-toolbar d-flex gap-2">
+        <div class="annotation-toolbar d-flex flex-wrap gap-2">
             <div class="btn-group shadow-sm">
                 <button class="btn btn-outline-secondary" title="Highlight (Yellow)" onclick="studentAnnotations.setTool('highlight-yellow')">
                     <span style="color: #fbbf24;">●</span> Highlight
@@ -61,7 +61,7 @@
         @if (hasAccess)
         {
             <!-- PDF Viewer iframe or canvas -->
-            <div id="pdf-container" style="position: relative; margin: 0 auto; width: fit-content; padding: 20px;">
+            <div id="pdf-container" style="position: relative; margin: 0 auto; width: fit-content; max-width: 100%; padding: 10px; overflow-x: auto;">
                 <canvas id="pdf-canvas" class="shadow"></canvas>
                 <!-- Annotation layer overlaid on top of the PDF canvas -->
                 <canvas id="annotation-canvas" style="position: absolute; top: 20px; left: 20px; cursor: crosshair; z-index: 10;"></canvas>

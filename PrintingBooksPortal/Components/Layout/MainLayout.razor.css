@@ -45,6 +45,12 @@
     animation: fadeIn 0.25s ease;
 }
 
+@media (max-width: 768px) {
+    .app-content {
+        padding: 0.75rem;
+    }
+}
+
 .sidebar-toggle {
     background: none;
     border: none;
@@ -277,10 +283,20 @@
 #blazor-error-ui .dismiss:hover { opacity: 1; }
 
 @media (max-width: 991px) {
+    .sidebar-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(15, 23, 42, 0.4);
+        backdrop-filter: blur(2px);
+        z-index: 1040;
+        animation: fadeIn 0.3s ease;
+    }
+
     .app-sidebar {
         transform: translateX(-100%);
         position: fixed;
         z-index: 1050;
+        box-shadow: 10px 0 30px rgba(0,0,0,0.15);
     }
 
     .app-sidebar.show {

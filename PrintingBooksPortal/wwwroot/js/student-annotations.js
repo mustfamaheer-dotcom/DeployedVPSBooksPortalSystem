@@ -28,8 +28,8 @@ window.studentAnnotations = {
         this.loadAnnotations();
         this.setupEventListeners();
         
-        // Asynchronous download of PDF
-        pdfjsLib.getDocument(pdfUrl).promise.then(function(pdfDoc_) {
+        // Asynchronous download of PDF with credentials (to send cookies for [Authorize] endpoint)
+        pdfjsLib.getDocument({ url: pdfUrl, withCredentials: true }).promise.then(function(pdfDoc_) {
             window.studentAnnotations.pdfDoc = pdfDoc_;
             document.getElementById('page-count').textContent = window.studentAnnotations.pdfDoc.numPages;
             
@@ -37,7 +37,11 @@ window.studentAnnotations = {
             window.studentAnnotations.renderPage(window.studentAnnotations.pageNum);
         }).catch(function(error) {
             console.error("Error loading PDF: ", error);
-            alert("Error loading the document. It may have been removed or you lost access.");
+            if (window.showToast) {
+                window.showToast("Error loading the document. Your session may have expired or you lost access.", "error");
+            } else {
+                alert("Error loading the document. It may have been removed or you lost access.");
+            }
         });
     },
     

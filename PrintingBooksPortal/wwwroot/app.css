@@ -3751,3 +3751,58 @@ textarea.watermark-textarea {
 
 /* Body frozen by the devtools-blocking overlay */
 .body-frozen { overflow: hidden; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVENESS TWEAKS
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    /* Make tables responsive */
+    .table-modern {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Stack teacher hero */
+    .teacher-hero {
+        flex-direction: column;
+        text-align: center;
+        padding: 1rem;
+    }
+
+    /* Adjust grids for mobile */
+    .detail-grid, .analytics-grid, .analytics-row {
+        grid-template-columns: 1fr !important;
+        gap: 0.5rem;
+    }
+    
+    .stat-card-inner {
+        padding: 1rem;
+    }
+    
+    .quick-actions {
+        flex-direction: row;
+        overflow-x: auto;
+        padding-bottom: 0.5rem;
+    }
+
+    .quick-action-item {
+        flex-direction: column;
+        text-align: center;
+        min-width: 100px;
+    }
+    
+    .quick-action-desc {
+        display: none; /* Hide desc on mobile to save space */
+    }
+
+    /* Modern cards */
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .modal-body {
+        padding: 1rem;
+    }
+}
