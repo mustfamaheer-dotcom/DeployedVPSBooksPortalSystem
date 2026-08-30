@@ -1,209 +1,307 @@
 @page "/register"
-@layout PublicLayout
+@layout LoginLayout
 @inject NavigationManager Navigation
-@inject AppDbContext Db
+@inject IServiceScopeFactory ScopeFactory
 
-<div class="auth-layout min-vh-100 d-flex align-items-center justify-content-center py-5">
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-md-8 col-lg-7">
-                <div class="text-center mb-4">
-                    <h2 class="fw-bold">Create your account</h2>
-                    <p class="text-muted">Choose your account type to get started</p>
+<div class="lp-shell">
+    <!-- ════════════════════════════════════════
+         LEFT  — branding panel
+    ════════════════════════════════════════ -->
+    <aside class="lp-brand-panel">
+        <div class="lp-bp-grid"></div>
+        <div class="lp-bp-glow lp-bp-glow-1"></div>
+        <div class="lp-bp-glow lp-bp-glow-2"></div>
+
+        <div class="lp-bp-inner">
+            <div class="lp-logo">
+                <div class="lp-logo-icon">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+                         stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                    </svg>
                 </div>
-                
-                <div class="auth-card p-0">
-                    <ul class="nav nav-tabs nav-fill auth-tabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link @(activeTab == "student" ? "active" : "")" @onclick='() => activeTab = "student"'>
-                                Student
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link @(activeTab == "teacher" ? "active" : "")" @onclick='() => activeTab = "teacher"'>
-                                Teacher / Publisher
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link @(activeTab == "bookshop" ? "active" : "")" @onclick='() => activeTab = "bookshop"'>
-                                Bookshop
-                            </button>
-                        </li>
-                    </ul>
-                    
-                    <div class="p-4 p-md-5">
-                        @if (!string.IsNullOrEmpty(successMessage))
-                        {
-                            <div class="alert alert-success text-center">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-2 mb-1"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                                <div>@successMessage</div>
-                                <div class="mt-3">
-                                    <a href="/login" class="btn btn-sm btn-outline-success">Go to Sign In</a>
+                <div>
+                    <div class="lp-logo-name">PrintingBooks</div>
+                    <div class="lp-logo-sub">Management Portal</div>
+                </div>
+            </div>
+
+            <div class="lp-tagline">
+                <h1>
+                    Join our network,<br>
+                    <span class="lp-gradient-text">start printing.</span>
+                </h1>
+                <p>Register as a student to access your assigned books, or as a publisher/bookshop to manage printing securely.</p>
+            </div>
+            
+            <!-- feature pills -->
+            <div class="lp-features">
+                <div class="lp-feat">
+                    <span class="lp-feat-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                    </span>
+                    <div>
+                        <div class="lp-feat-title">Student Access</div>
+                        <div class="lp-feat-desc">Study and annotate your books privately</div>
+                    </div>
+                </div>
+                <div class="lp-feat">
+                    <span class="lp-feat-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                    </span>
+                    <div>
+                        <div class="lp-feat-title">Secure & Protected</div>
+                        <div class="lp-feat-desc">Industry-leading PDF and Print protection</div>
+                    </div>
+                </div>
+            </div>
+
+            <p class="lp-bp-credit">&copy; @DateTime.Now.Year PrintingBooks Portal</p>
+        </div>
+    </aside>
+
+    <!-- ════════════════════════════════════════
+         RIGHT — form panel
+    ════════════════════════════════════════ -->
+    <main class="lp-form-panel" style="overflow-y: auto;">
+        <div class="lp-form-wrap" style="max-width: 500px; padding: 2rem;">
+
+            <!-- mobile-only logo -->
+            <div class="lp-mobile-logo">
+                <div class="lp-logo-icon" style="width:38px;height:38px;border-radius:10px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                         stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                    </svg>
+                </div>
+                <div>
+                    <div style="font-weight:700;font-size:0.95rem;color:var(--gray-900)">PrintingBooks</div>
+                    <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--gray-400)">Management Portal</div>
+                </div>
+            </div>
+
+            <!-- heading -->
+            <div class="lp-form-head mb-4">
+                <h2 style="font-size: 1.75rem;">Create Account</h2>
+                <p>Choose your role to get started</p>
+            </div>
+
+            <!-- Tab switcher -->
+            <div class="auth-tabs-modern mb-4">
+                <button class="@(activeTab == "student" ? "active" : "")" @onclick='() => activeTab = "student"' type="button">Student</button>
+                <button class="@(activeTab == "teacher" ? "active" : "")" @onclick='() => activeTab = "teacher"' type="button">Teacher</button>
+                <button class="@(activeTab == "bookshop" ? "active" : "")" @onclick='() => activeTab = "bookshop"' type="button">Bookshop</button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="lp-error-banner" style="background: #ecfdf5; border-color: #d1fae5; color: #065f46;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                    </svg>
+                    <span>@successMessage</span>
+                </div>
+                <div class="mt-4">
+                    <a href="/login" class="lp-submit text-decoration-none text-center d-block">Go to Sign In</a>
+                </div>
+            }
+            else
+            {
+                @if (!string.IsNullOrEmpty(error))
+                {
+                    <div class="lp-error-banner">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="15" y1="9" x2="9" y2="15"/>
+                            <line x1="9" y1="9" x2="15" y2="15"/>
+                        </svg>
+                        <span>@error</span>
+                    </div>
+                }
+
+                <form @onsubmit="SubmitForm" @onsubmit:preventDefault autocomplete="off">
+
+                    @if (activeTab == "student")
+                    {
+                        <div class="lp-field">
+                            <label>Full Name</label>
+                            <input type="text" class="lp-input" @bind="name" required />
+                        </div>
+                        <div class="lp-field">
+                            <label>Email Address</label>
+                            <input type="email" class="lp-input" @bind="email" required />
+                        </div>
+                        <div class="lp-field">
+                            <label>Password</label>
+                            <input type="password" class="lp-input" @bind="password" required />
+                        </div>
+                        <div class="lp-field mt-4">
+                            <label>Choose your Teachers</label>
+                            <p style="font-size: 0.85rem; color: var(--gray-500); margin-bottom: 12px; margin-top:-4px;">Select the teachers you want to enroll with.</p>
+                            @if (activeTenants == null)
+                            {
+                                <div style="font-size: 0.85rem; color: var(--gray-500);">Loading teachers...</div>
+                            }
+                            else
+                            {
+                                <div class="teacher-grid">
+                                    @foreach (var t in activeTenants)
+                                    {
+                                        var isSelected = selectedTenants.Contains(t.Id);
+                                        <div class="t-card @(isSelected ? "selected" : "")" @onclick="() => ToggleTenant(t.Id)">
+                                            <input type="checkbox" checked="@isSelected" readonly />
+                                            <span>@t.Name</span>
+                                        </div>
+                                    }
                                 </div>
-                            </div>
+                            }
+                        </div>
+                    }
+                    else if (activeTab == "teacher")
+                    {
+                        <div class="lp-field">
+                            <label>Publisher / Organization Name</label>
+                            <input type="text" class="lp-input" @bind="orgName" required />
+                        </div>
+                        <div class="lp-field">
+                            <label>Owner Name</label>
+                            <input type="text" class="lp-input" @bind="name" required />
+                        </div>
+                        <div class="lp-field">
+                            <label>Email Address</label>
+                            <input type="email" class="lp-input" @bind="email" required />
+                        </div>
+                        <div class="lp-field">
+                            <label>Phone Number (Optional)</label>
+                            <input type="tel" class="lp-input" @bind="phone" />
+                        </div>
+                        <div class="lp-field">
+                            <label>Password</label>
+                            <input type="password" class="lp-input" @bind="password" required />
+                        </div>
+                    }
+                    else if (activeTab == "bookshop")
+                    {
+                        <div class="lp-field">
+                            <label>Bookshop Name</label>
+                            <input type="text" class="lp-input" @bind="orgName" required />
+                        </div>
+                        <div class="lp-field">
+                            <label>Owner Name</label>
+                            <input type="text" class="lp-input" @bind="name" required />
+                        </div>
+                        <div class="lp-field">
+                            <label>Email Address</label>
+                            <input type="email" class="lp-input" @bind="email" required />
+                        </div>
+                        <div class="lp-field">
+                            <label>Phone Number</label>
+                            <input type="tel" class="lp-input" @bind="phone" required />
+                        </div>
+                        <div class="lp-field">
+                            <label>Shop Address</label>
+                            <input type="text" class="lp-input" @bind="address" required />
+                        </div>
+                        <div class="lp-field">
+                            <label>Password</label>
+                            <input type="password" class="lp-input" @bind="password" required />
+                        </div>
+                    }
+
+                    <button type="submit" class="lp-submit mt-4" disabled="@isSubmitting">
+                        @if (isSubmitting)
+                        {
+                            <span>Submitting...</span>
                         }
                         else
                         {
-                            @if (!string.IsNullOrEmpty(error))
-                            {
-                                <div class="alert alert-danger mb-4">@error</div>
-                            }
-                            
-                            <form @onsubmit="SubmitForm" @onsubmit:preventDefault>
-                                
-                                @if (activeTab == "student")
-                                {
-                                    <div class="row g-3">
-                                        <div class="col-12">
-                                            <label class="form-label">Full Name</label>
-                                            <input type="text" class="form-control" @bind="name" required />
-                                        </div>
-                                        <div class="col-12">
-                                            <label class="form-label">Email Address</label>
-                                            <input type="email" class="form-control" @bind="email" required />
-                                        </div>
-                                        <div class="col-12">
-                                            <label class="form-label">Password</label>
-                                            <input type="password" class="form-control" @bind="password" required />
-                                        </div>
-                                        <div class="col-12 mt-4">
-                                            <label class="form-label fw-semibold">Choose your Teachers</label>
-                                            <p class="small text-muted mb-2">Select the teachers you want to enroll with.</p>
-                                            
-                                            @if (activeTenants == null)
-                                            {
-                                                <div>Loading teachers...</div>
-                                            }
-                                            else
-                                            {
-                                                <div class="teacher-selection-grid">
-                                                    @foreach (var t in activeTenants)
-                                                    {
-                                                        var isSelected = selectedTenants.Contains(t.Id);
-                                                        <div class="teacher-card @(isSelected ? "selected" : "")" @onclick="() => ToggleTenant(t.Id)">
-                                                            <div class="form-check">
-                                                                <input class="form-check-input" type="checkbox" checked="@isSelected" readonly />
-                                                                <label class="form-check-label fw-semibold">@t.Name</label>
-                                                            </div>
-                                                        </div>
-                                                    }
-                                                </div>
-                                            }
-                                        </div>
-                                    </div>
-                                }
-                                else if (activeTab == "teacher")
-                                {
-                                    <div class="row g-3">
-                                        <div class="col-12">
-                                            <label class="form-label">Publisher / Organization Name</label>
-                                            <input type="text" class="form-control" @bind="orgName" required />
-                                        </div>
-                                        <div class="col-12">
-                                            <label class="form-label">Owner Name</label>
-                                            <input type="text" class="form-control" @bind="name" required />
-                                        </div>
-                                        <div class="col-12">
-                                            <label class="form-label">Email Address</label>
-                                            <input type="email" class="form-control" @bind="email" required />
-                                        </div>
-                                        <div class="col-12">
-                                            <label class="form-label">Phone Number (Optional)</label>
-                                            <input type="tel" class="form-control" @bind="phone" />
-                                        </div>
-                                        <div class="col-12">
-                                            <label class="form-label">Password</label>
-                                            <input type="password" class="form-control" @bind="password" required />
-                                        </div>
-                                    </div>
-                                }
-                                else if (activeTab == "bookshop")
-                                {
-                                    <div class="row g-3">
-                                        <div class="col-12">
-                                            <label class="form-label">Bookshop Name</label>
-                                            <input type="text" class="form-control" @bind="orgName" required />
-                                        </div>
-                                        <div class="col-12">
-                                            <label class="form-label">Owner Name</label>
-                                            <input type="text" class="form-control" @bind="name" required />
-                                        </div>
-                                        <div class="col-12">
-                                            <label class="form-label">Email Address</label>
-                                            <input type="email" class="form-control" @bind="email" required />
-                                        </div>
-                                        <div class="col-12">
-                                            <label class="form-label">Phone Number</label>
-                                            <input type="tel" class="form-control" @bind="phone" required />
-                                        </div>
-                                        <div class="col-12">
-                                            <label class="form-label">Shop Address</label>
-                                            <input type="text" class="form-control" @bind="address" required />
-                                        </div>
-                                        <div class="col-12">
-                                            <label class="form-label">Password</label>
-                                            <input type="password" class="form-control" @bind="password" required />
-                                        </div>
-                                    </div>
-                                }
-
-                                <button type="submit" class="btn btn-primary w-100 mt-4 py-2" disabled="@isSubmitting">
-                                    @if (isSubmitting)
-                                    {
-                                        <span class="spinner-border spinner-border-sm me-2"></span>
-                                        <span>Submitting...</span>
-                                    }
-                                    else
-                                    {
-                                        <span>Create Account</span>
-                                    }
-                                </button>
-                            </form>
+                            <span>Create Account</span>
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                                <polyline points="10 17 15 12 10 7"/>
+                                <line x1="15" y1="12" x2="3" y2="12"/>
+                            </svg>
                         }
+                    </button>
+
+                    <div style="margin-top: 1.5rem; text-align: center; font-size: 0.9rem; color: var(--gray-500);">
+                        Already have an account? <a href="/login" style="color: var(--primary); font-weight: 600; text-decoration: none;">Sign in here</a>
                     </div>
-                </div>
-                
-                <div class="text-center mt-4">
-                    <p class="text-muted">Already have an account? <a href="/login" class="text-decoration-none fw-semibold">Sign in here</a></p>
-                </div>
-            </div>
+                </form>
+            }
         </div>
-    </div>
+    </main>
 </div>
 
 <style>
-    .auth-tabs .nav-link {
-        color: var(--gray-500);
-        font-weight: 500;
+    /* Modern Tab Switcher */
+    .auth-tabs-modern {
+        display: flex;
+        background: var(--gray-100);
+        padding: 4px;
+        border-radius: var(--radius-lg);
+        gap: 4px;
+    }
+    .auth-tabs-modern button {
+        flex: 1;
         border: none;
-        border-bottom: 2px solid transparent;
-        padding: 1rem;
-        border-radius: 0;
-        transition: all 0.2s;
         background: transparent;
-    }
-    .auth-tabs .nav-link:hover { color: var(--gray-700); }
-    .auth-tabs .nav-link.active {
-        color: var(--primary);
-        border-bottom-color: var(--primary);
-        background: var(--primary-light);
-    }
-    .teacher-selection-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 10px;
-    }
-    .teacher-card {
-        border: 1px solid var(--gray-200);
+        padding: 8px 12px;
         border-radius: var(--radius-md);
-        padding: 12px;
+        font-weight: 500;
+        font-size: 0.9rem;
+        color: var(--gray-600);
+        transition: all 0.2s ease;
+    }
+    .auth-tabs-modern button:hover {
+        color: var(--gray-900);
+    }
+    .auth-tabs-modern button.active {
+        background: white;
+        color: var(--primary);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        font-weight: 600;
+    }
+
+    /* Modern Teacher Selectors */
+    .teacher-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 12px;
+    }
+    .t-card {
+        border: 1px solid var(--gray-200);
+        background: white;
+        padding: 12px 16px;
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        gap: 10px;
         cursor: pointer;
         transition: all 0.2s;
     }
-    .teacher-card:hover { border-color: var(--gray-300); }
-    .teacher-card.selected {
+    .t-card:hover {
+        border-color: var(--gray-300);
+        background: var(--gray-50);
+    }
+    .t-card.selected {
         border-color: var(--primary);
-        background: var(--primary-light);
+        background: #f0f5ff; /* Soft primary tint */
+    }
+    .t-card span {
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: var(--gray-800);
     }
 </style>
 
@@ -227,7 +325,15 @@
 
     protected override async Task OnInitializedAsync()
     {
-        activeTenants = await Db.Tenants.Where(t => t.IsActive && t.Id != 1).OrderBy(t => t.Name).ToListAsync();
+        // Fix for "A second operation was started on this context instance..."
+        // Use a local DI scope for the DbContext fetch so it doesn't share the Circuit's default DbContext
+        using var scope = ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        
+        activeTenants = await db.Tenants
+            .Where(t => t.IsActive && t.Id != 1)
+            .OrderBy(t => t.Name)
+            .ToListAsync();
     }
 
     private void ToggleTenant(int tenantId)
