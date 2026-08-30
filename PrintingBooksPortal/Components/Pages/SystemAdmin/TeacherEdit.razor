@@ -26,23 +26,26 @@
     }
     else
     {
-        <div class="teacher-hero">
-            <span class="avatar-initials avatar-xl" style="background: hsl(@HueFor(tenant?.name ?? "") 62% 46%);">@Initials(tenant?.name)</span>
+        <div class="teacher-hero d-flex align-items-center gap-4 p-4 rounded mb-4 bg-white border">
+            <div class="avatar-initials avatar-xl flex-shrink-0 d-flex align-items-center justify-content-center text-white rounded-circle shadow-sm" 
+                 style="background: hsl(@HueFor(tenant?.name ?? "") 62% 46%); width: 80px; height: 80px; font-size: 2.5rem; font-weight: 600;">
+                @Initials(tenant?.name)
+            </div>
             <div class="teacher-hero-info">
-                <div class="d-flex flex-wrap align-items-center gap-2">
-                    <h2 class="mb-0">@tenant?.name</h2>
+                <div class="d-flex flex-wrap align-items-center gap-3 mb-2">
+                    <h2 class="mb-0 fw-bold">@tenant?.name</h2>
                     <span class="plan-badge plan-@(PlanClass(tenant?.plan))">@(tenant?.plan ?? "Standard")</span>
-                    <span class="status-badge @(tenant?.isActive == true ? "status-active" : "status-inactive")">
+                    <span class="status-badge @(tenant?.isActive == true ? "status-active" : "status-inactive") px-3 py-1">
                         <span class="status-dot"></span>
                         @(tenant?.isActive == true ? "Active" : "Inactive")
                     </span>
                 </div>
-                <div class="small text-muted mt-1">
-                    @(tenant?.ownerName ?? "—") &middot; @(tenant?.contactEmail ?? "—") &middot; @(tenant?.phone ?? "—")
+                <div class="text-muted mb-2 fs-6">
+                    <strong>@(tenant?.ownerName ?? "—")</strong> &middot; @(tenant?.contactEmail ?? "—") &middot; @(tenant?.phone ?? "—")
                 </div>
-                <div class="small mt-1">
-                    <span class="usage-pill"><span class="usage-dot usage-dot-primary"></span>Tenant #@(tenant?.id ?? 0)</span>
-                    <span class="usage-pill"><span class="usage-dot usage-dot-purple"></span>Member since @(tenant?.createdAt.ToEgyptLocal().ToString("dd MMM yyyy"))</span>
+                <div class="d-flex gap-3 mt-1">
+                    <span class="usage-pill px-3 py-1"><span class="usage-dot usage-dot-primary"></span>Tenant #@(tenant?.id ?? 0)</span>
+                    <span class="usage-pill px-3 py-1"><span class="usage-dot usage-dot-purple"></span>Member since @(tenant?.createdAt.ToEgyptLocal().ToString("dd MMM yyyy"))</span>
                 </div>
             </div>
         </div>
@@ -150,42 +153,50 @@
                         }
                         else
                         {
-                            <table class="table table-modern">
-                                <thead>
-                                    <tr><th>Prefix</th><th>Bound To</th><th>Created</th><th>Status</th><th class="text-end"></th></tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var k in apiKeys)
-                                    {
+                            <div class="table-responsive">
+                                <table class="table table-modern table-hover align-middle mb-0">
+                                    <thead class="table-light">
                                         <tr>
-                                            <td><code>@k.prefix…</code></td>
-                                            <td>
-                                                @if (k.shopId.HasValue)
-                                                {
-                                                    <span class="usage-pill"><span class="usage-dot usage-dot-primary"></span>@k.shopName</span>
-                                                }
-                                                else
-                                                {
-                                                    <span class="text-muted">Tenant-wide</span>
-                                                }
-                                            </td>
-                                            <td>@k.createdAt.ToEgyptLocal().ToString("g")</td>
-                                            <td>
-                                                <span class="status-badge @(k.isActive ? "status-active" : "status-inactive")">
-                                                    <span class="status-dot"></span>
-                                                    @(k.isActive ? "Active" : "Revoked")
-                                                </span>
-                                            </td>
-                                            <td class="text-end">
-                                                @if (k.isActive)
-                                                {
-                                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => RevokeKey(k.Id)">Revoke</button>
-                                                }
-                                            </td>
+                                            <th class="ps-3 border-0 rounded-start">Prefix</th>
+                                            <th class="border-0">Bound To</th>
+                                            <th class="border-0">Created</th>
+                                            <th class="border-0">Status</th>
+                                            <th class="text-end pe-3 border-0 rounded-end">Action</th>
                                         </tr>
-                                    }
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var k in apiKeys)
+                                        {
+                                            <tr>
+                                                <td class="ps-3"><code class="bg-light px-2 py-1 rounded text-dark border">@k.prefix…</code></td>
+                                                <td>
+                                                    @if (k.shopId.HasValue)
+                                                    {
+                                                        <span class="usage-pill bg-primary-subtle text-primary border-primary-subtle px-2 py-1"><span class="usage-dot usage-dot-primary"></span>@k.shopName</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-secondary text-white">Tenant-wide</span>
+                                                    }
+                                                </td>
+                                                <td class="text-muted small">@k.createdAt.ToEgyptLocal().ToString("MMM dd, yyyy HH:mm")</td>
+                                                <td>
+                                                    <span class="status-badge @(k.isActive ? "status-active" : "status-inactive") px-2 py-1">
+                                                        <span class="status-dot"></span>
+                                                        @(k.isActive ? "Active" : "Revoked")
+                                                    </span>
+                                                </td>
+                                                <td class="text-end pe-3">
+                                                    @if (k.isActive)
+                                                    {
+                                                        <button class="btn btn-sm btn-outline-danger px-3 rounded-pill" @onclick="() => RevokeKey(k.Id)">Revoke</button>
+                                                    }
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
                         }
                     </div>
                 </div>
@@ -207,9 +218,12 @@
                                 @foreach (var s in shops)
                                 {
                                     <div class="list-group-item d-flex align-items-center justify-content-between">
-                                        <div class="d-flex align-items-center gap-2">
-                                            <span class="avatar-initials avatar-sm" style="background: hsl(@HueFor(s.Name) 62% 46%);">@Initials(s.Name)</span>
-                                            <span class="fw-semibold">@s.Name</span>
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="avatar-initials avatar-sm flex-shrink-0 d-flex align-items-center justify-content-center text-white rounded-circle shadow-sm" 
+                                                 style="background: hsl(@HueFor(s.Name) 62% 46%); width: 40px; height: 40px; font-weight: bold;">
+                                                @Initials(s.Name)
+                                            </div>
+                                            <span class="fw-semibold text-dark fs-6">@s.Name</span>
                                         </div>
                                         <div class="usage-pills">
                                             <span class="usage-pill"><span class="usage-dot usage-dot-primary"></span>@s.UsersCount users</span>
@@ -236,16 +250,25 @@
                         else
                         {
                             <div class="table-container">
-                                <table class="table table-modern">
-                                    <thead><tr><th>When</th><th>Shop</th><th>Book</th><th class="text-end">Copies</th></tr></thead>
+                                <table class="table table-modern table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="ps-3 border-0 rounded-start">When</th>
+                                            <th class="border-0">Shop</th>
+                                            <th class="border-0">Book</th>
+                                            <th class="text-end pe-3 border-0 rounded-end">Copies</th>
+                                        </tr>
+                                    </thead>
                                     <tbody>
                                         @foreach (var l in printLogs)
                                         {
                                             <tr>
-                                                <td>@l.PrintedAt.ToEgyptLocal().ToString("g")</td>
-                                                <td>@l.ShopName</td>
-                                                <td>@l.BookTitle</td>
-                                                <td class="text-end"><span class="count-badge">@l.Copies</span></td>
+                                                <td class="ps-3 text-muted small">@l.PrintedAt.ToEgyptLocal().ToString("MMM dd, yyyy HH:mm")</td>
+                                                <td class="fw-medium text-dark">@l.ShopName</td>
+                                                <td class="text-muted">@l.BookTitle</td>
+                                                <td class="text-end pe-3">
+                                                    <span class="badge bg-primary rounded-pill px-3 py-2 fs-6">@l.Copies</span>
+                                                </td>
                                             </tr>
                                         }
                                     </tbody>
