@@ -290,6 +290,11 @@
         backdrop-filter: blur(2px);
         z-index: 1040;
         animation: fadeIn 0.3s ease;
+        display: none;
+    }
+
+    .sidebar-overlay.show {
+        display: block;
     }
 
     .app-sidebar {

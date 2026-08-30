@@ -19,4 +19,8 @@ export function toggleSidebar() {
     if (sidebar) {
         sidebar.classList.toggle('show');
     }
+    const overlay = document.querySelector('.sidebar-overlay');
+    if (overlay) {
+        overlay.classList.toggle('show');
+    }
 }
