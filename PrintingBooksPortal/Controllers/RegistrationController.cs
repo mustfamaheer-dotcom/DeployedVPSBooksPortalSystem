@@ -17,21 +17,21 @@ public class RegistrationController : ControllerBase
     }
 
     [HttpPost("teacher")]
-    public async Task<IActionResult> RegisterTeacher([FromForm] string name, [FromForm] string email, [FromForm] string phone, [FromForm] string organization, [FromForm] string message, [FromForm] string password)
+    public async Task<IActionResult> RegisterTeacher([FromForm] string name, [FromForm] string email, [FromForm] string? phone, [FromForm] string organization, [FromForm] string? message, [FromForm] string password)
     {
         await _registrationService.SubmitTeacherRequestAsync(name, email, phone, organization, message, password);
         return Ok(new { success = true });
     }
 
     [HttpPost("bookshop")]
-    public async Task<IActionResult> RegisterBookshop([FromForm] string name, [FromForm] string email, [FromForm] string phone, [FromForm] string bookshopName, [FromForm] string address, [FromForm] string message, [FromForm] string password)
+    public async Task<IActionResult> RegisterBookshop([FromForm] string name, [FromForm] string email, [FromForm] string phone, [FromForm] string bookshopName, [FromForm] string address, [FromForm] string? message, [FromForm] string password)
     {
         await _registrationService.SubmitBookshopRequestAsync(name, email, phone, bookshopName, address, message, password);
         return Ok(new { success = true });
     }
 
     [HttpPost("student")]
-    public async Task<IActionResult> RegisterStudent([FromForm] string name, [FromForm] string email, [FromForm] string password, [FromForm] string message, [FromForm] List<int> tenantIds)
+    public async Task<IActionResult> RegisterStudent([FromForm] string name, [FromForm] string email, [FromForm] string password, [FromForm] string? message, [FromForm] List<int> tenantIds)
     {
         if (tenantIds == null || tenantIds.Count == 0)
             return BadRequest(new { success = false, error = "Must select at least one teacher" });
