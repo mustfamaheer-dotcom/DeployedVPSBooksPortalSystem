@@ -1,0 +1,146 @@
+@page "/bookshop-owner/history"
+@attribute [Authorize(Roles = "BookshopOwner")]
+@rendermode InteractiveServer
+@inject AppDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+
+<div class="content-area">
+    <div class="page-header">
+        <div>
+            <h1>Print History</h1>
+            <p class="page-subtitle">A comprehensive log of all printing activities across your shops</p>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <div class="table-container">
+            <table class="table table-modern">
+                <thead>
+                    <tr>
+                        <th>Date / Time</th>
+                        <th>Book Title</th>
+                        <th>Teacher / Publisher</th>
+                        <th>Printed By</th>
+                        <th class="text-end">Copies</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (logs == null)
+                    {
+                        <tr><td colspan="5" class="text-center py-4 text-muted">Loading history...</td></tr>
+                    }
+                    else if (!logs.Any())
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center py-5">
+                                <div class="empty-state">
+                                    <div class="empty-icon">
+                                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="1.5"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+                                    </div>
+                                    <p class="text-muted mb-0">No print records found.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var log in logs)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">@log.PrintedAt.ToLocalTime().ToString("MMM dd, yyyy")</div>
+                                    <div class="text-muted small">@log.PrintedAt.ToLocalTime().ToString("hh:mm tt")</div>
+                                </td>
+                                <td><div class="fw-semibold text-dark">@log.BookTitle</div></td>
+                                <td>@log.Tenant.Name</td>
+                                <td>
+                                    <div>@log.PrintedByUserName</div>
+                                    <div class="text-muted small"><code>@log.IPAddress</code></div>
+                                </td>
+                                <td class="text-end">
+                                    <span class="count-badge count-badge-primary">@log.Copies</span>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+        
+        @if (totalRecords > pageSize)
+        {
+            <div class="card-footer bg-white border-top d-flex justify-content-between align-items-center">
+                <div class="text-muted small">
+                    Showing @(logs?.Count ?? 0) of @totalRecords records
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-secondary" disabled="@(currentPage == 1)" @onclick="PrevPage">Previous</button>
+                    <button class="btn btn-sm btn-outline-secondary" disabled="@(currentPage == totalPages)" @onclick="NextPage">Next</button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<PrintLog>? logs;
+    private int currentPage = 1;
+    private const int pageSize = 20;
+    private int totalRecords;
+    private int totalPages => (int)Math.Ceiling((double)totalRecords / pageSize);
+    private List<int>? shopIds;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthState!;
+        var user = await UserManager.GetUserAsync(authState.User);
+        if (user == null) return;
+        
+        shopIds = new List<int>();
+        if (user.ShopId.HasValue) shopIds.Add(user.ShopId.Value);
+        
+        await LoadLogs();
+    }
+
+    private async Task LoadLogs()
+    {
+        if (shopIds == null || !shopIds.Any())
+        {
+            logs = new List<PrintLog>();
+            return;
+        }
+        
+        var query = Db.PrintLogs
+            .Include(l => l.Tenant)
+            .Where(l => shopIds.Contains(l.ShopId));
+            
+        totalRecords = await query.CountAsync();
+        
+        logs = await query
+            .OrderByDescending(l => l.PrintedAt)
+            .Skip((currentPage - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+    }
+    
+    private async Task NextPage()
+    {
+        if (currentPage < totalPages)
+        {
+            currentPage++;
+            await LoadLogs();
+        }
+    }
+    
+    private async Task PrevPage()
+    {
+        if (currentPage > 1)
+        {
+            currentPage--;
+            await LoadLogs();
+        }
+    }
+}

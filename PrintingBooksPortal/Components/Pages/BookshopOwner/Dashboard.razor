@@ -1,0 +1,141 @@
+@page "/bookshop-owner/dashboard"
+@attribute [Authorize(Roles = "BookshopOwner")]
+@rendermode InteractiveServer
+@inject AppDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@inject ITenantContext TenantContext
+
+<div class="content-area">
+    <div class="page-header">
+        <div>
+            <h1>Dashboard</h1>
+            <p class="page-subtitle">Welcome to your Bookshop Owner Portal</p>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="stat-card stat-card-primary">
+                <div class="stat-card-bg"></div>
+                <div class="stat-card-inner">
+                    <div class="stat-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                    </div>
+                    <div class="stat-info">
+                        <div class="stat-label">Total Assigned Books</div>
+                        <div class="stat-value">@totalBooks</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card stat-card-success">
+                <div class="stat-card-bg"></div>
+                <div class="stat-card-inner">
+                    <div class="stat-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    </div>
+                    <div class="stat-info">
+                        <div class="stat-label">Teachers Connected</div>
+                        <div class="stat-value">@totalTeachers</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card stat-card-warning">
+                <div class="stat-card-bg"></div>
+                <div class="stat-card-inner">
+                    <div class="stat-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    </div>
+                    <div class="stat-info">
+                        <div class="stat-label">Total Prints</div>
+                        <div class="stat-value">@totalPrints</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="content-card">
+        <div class="card-header">
+            <h5>Recent Print Activity</h5>
+        </div>
+        <div class="card-body p-0">
+            @if (recentLogs == null)
+            {
+                <div class="p-4 text-center text-muted">Loading...</div>
+            }
+            else if (!recentLogs.Any())
+            {
+                <div class="p-4 text-center text-muted">No print activity yet.</div>
+            }
+            else
+            {
+                <div class="table-container">
+                    <table class="table table-modern">
+                        <thead>
+                            <tr>
+                                <th>Date/Time</th>
+                                <th>Book Title</th>
+                                <th>Teacher (Tenant)</th>
+                                <th>Copies</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var log in recentLogs)
+                            {
+                                <tr>
+                                    <td class="text-muted">@log.PrintedAt.ToLocalTime().ToString("g")</td>
+                                    <td class="fw-semibold">@log.BookTitle</td>
+                                    <td>@log.Tenant.Name</td>
+                                    <td><span class="count-badge">@log.Copies</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private int totalBooks;
+    private int totalTeachers;
+    private int totalPrints;
+    private List<PrintLog>? recentLogs;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthState!;
+        var user = await UserManager.GetUserAsync(authState.User);
+        if (user == null) return;
+        
+        // As a BookshopOwner, they manage their 'Shop' across multiple tenants.
+        // We find their shop ID by matching the owner user ID.
+        var shop = await Db.Shops.FirstOrDefaultAsync(s => s.Id == user.ShopId);
+        if (shop != null)
+        {
+            var shopId = shop.Id;
+            
+            // Note: In reality, since BookshopOwner might be across tenants in v2, 
+            // they would need a Global Shop ID, but currently Shop is tied to TenantId.
+            // For v1 compatibility, we'll list stats for this specific shop.
+            totalBooks = await Db.ShopBookAssignments.CountAsync(a => a.ShopId == shopId && a.IsActive);
+            totalTeachers = await Db.ShopBookAssignments.Where(a => a.ShopId == shopId).Select(a => a.Book.TenantId).Distinct().CountAsync();
+            totalPrints = await Db.PrintLogs.Where(l => l.ShopId == shopId).SumAsync(l => l.Copies);
+            
+            recentLogs = await Db.PrintLogs
+                .Include(l => l.Tenant)
+                .Where(l => l.ShopId == shopId)
+                .OrderByDescending(l => l.PrintedAt)
+                .Take(5)
+                .ToListAsync();
+        }
+    }
+}

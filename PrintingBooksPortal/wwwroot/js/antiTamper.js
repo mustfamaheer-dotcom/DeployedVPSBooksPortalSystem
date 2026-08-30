@@ -60,6 +60,7 @@
     // "Inspect" path. Key values on Ctrl presses are lowercase, so compare
     // case-insensitively.
     document.addEventListener('keydown', function (e) {
+        if (window.allowDevTools) return;
         var k = (e.key || '').toLowerCase();
         if (
             k === 'f12' ||
@@ -77,6 +78,7 @@
     // on beforeprint in some builds, so keydown is the primary path and this
     // is the fallback for Ctrl+P sequences that slip past it).
     document.addEventListener('keyup', function (e) {
+        if (window.allowDevTools) return;
         var k = (e.key || '').toLowerCase();
         if (e.ctrlKey && (k === 'p' || k === 's')) {
             e.preventDefault();
@@ -85,6 +87,7 @@
     }, true);
 
     document.addEventListener('contextmenu', function (e) {
+        if (window.allowDevTools) return;
         e.preventDefault();
         return false;
     });
@@ -94,6 +97,7 @@
         var threshold = 160;
         var blocked = false;
         var check = function () {
+            if (window.allowDevTools) return;
             var w = window.outerWidth - window.innerWidth > threshold ||
                     window.outerHeight - window.innerHeight > threshold;
             if (w && !blocked) {
@@ -113,6 +117,8 @@
 
     // Disable console statements from the console window (best effort).
     try {
-        console.log('Access to the developer console is restricted.');
+        if (!window.allowDevTools) {
+            console.log('Access to the developer console is restricted.');
+        }
     } catch (err) { /* ignore */ }
 })();

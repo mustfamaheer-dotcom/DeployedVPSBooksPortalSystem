@@ -1,0 +1,117 @@
+@page "/student/dashboard"
+@attribute [Authorize(Roles = "Student")]
+@rendermode InteractiveServer
+@inject StudentService Students
+@inject UserManager<ApplicationUser> UserManager
+@inject NavigationManager Navigation
+@inject AppDbContext Db
+
+<div class="content-area">
+    <div class="page-header">
+        <div>
+            <h1>Student Dashboard</h1>
+            <p class="page-subtitle">Welcome back, @userName</p>
+        </div>
+    </div>
+
+    @if (pendingEnrollments != null && pendingEnrollments.Any())
+    {
+        <div class="alert alert-warning mb-4">
+            <h6 class="alert-heading fw-semibold">Pending Approvals</h6>
+            <p class="mb-0">Your enrollment requests for the following teachers are still pending approval:</p>
+            <ul class="mb-0 mt-2">
+                @foreach (var e in pendingEnrollments)
+                {
+                    <li>@e.Tenant.Name</li>
+                }
+            </ul>
+        </div>
+    }
+
+    <div class="content-card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">My Teachers</h5>
+        </div>
+        <div class="card-body p-0">
+            @if (approvedTeachers == null)
+            {
+                <div class="text-center py-4 text-muted">Loading teachers...</div>
+            }
+            else if (!approvedTeachers.Any())
+            {
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                    </div>
+                    <p>You don't have any approved teachers yet.</p>
+                </div>
+            }
+            else
+            {
+                <div class="list-group list-group-flush">
+                    @foreach (var t in approvedTeachers)
+                    {
+                        <button type="button" class="list-group-item list-group-item-action p-4 d-flex align-items-center justify-content-between" @onclick="() => OpenTeacher(t.Id)">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="avatar-initials avatar-md" style="background: hsl(@HFor(t.Name) 62% 46%);">
+                                    @Initials(t.Name)
+                                </div>
+                                <div>
+                                    <h5 class="mb-1 fw-semibold text-dark">@t.Name</h5>
+                                    <div class="text-muted small">View your assigned books for this teacher</div>
+                                </div>
+                            </div>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted"><polyline points="9 18 15 12 9 6"/></svg>
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private string userName = "";
+    private List<StudentEnrollment>? pendingEnrollments;
+    private List<Tenant>? approvedTeachers;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthState!;
+        var user = await UserManager.GetUserAsync(authState.User);
+        if (user == null) return;
+        
+        userName = user.FullName ?? user.UserName ?? "";
+
+        // Manually load since StudentService lists by tenantId instead of studentUserId
+        var allEnrollments = await Db.StudentEnrollments
+            .Include(e => e.Tenant)
+            .Where(e => e.StudentUserId == user.Id)
+            .ToListAsync();
+
+        pendingEnrollments = allEnrollments.Where(e => e.Status == EnrollmentStatus.Pending).ToList();
+        approvedTeachers = allEnrollments.Where(e => e.Status == EnrollmentStatus.Approved).Select(e => e.Tenant).ToList();
+    }
+
+    private void OpenTeacher(int tenantId)
+    {
+        Navigation.NavigateTo($"/student/books/{tenantId}");
+    }
+
+    private static string Initials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var words = name.Split([' ', '-', '_'], StringSplitOptions.RemoveEmptyEntries);
+        return words.Length > 1 ? $"{words[0][0]}{words[1][0]}".ToUpper() : words[0][..1].ToUpper();
+    }
+
+    private static int HFor(string text)
+    {
+        var sum = 0;
+        foreach (var c in text) sum += c;
+        return sum % 360;
+    }
+}

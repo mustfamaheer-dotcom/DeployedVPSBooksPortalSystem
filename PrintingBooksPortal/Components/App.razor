@@ -1,4 +1,5 @@
-﻿<!DOCTYPE html>
+@inject PrintingBooksPortal.Services.ISettingsService Settings
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -12,6 +13,9 @@
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
     <HeadOutlet />
+    <script>
+        window.allowDevTools = @(allowDevTools.ToString().ToLower());
+    </script>
 </head>
 
 <body>
@@ -25,3 +29,12 @@
 </body>
 
 </html>
+
+@code {
+    private bool allowDevTools = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        allowDevTools = await Settings.IsDeveloperToolsEnabledAsync();
+    }
+}

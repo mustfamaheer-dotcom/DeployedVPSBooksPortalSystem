@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @inject AppDbContext Db
 @inject PrintLoggingService PrintLogging
+@inject ITenantContext TenantContext
 
 <div class="content-area dashboard-page">
     <div class="page-header">
@@ -125,7 +126,22 @@
     else
     {
     <div class="row g-4 mb-4">
-        <div class="col-md-3 col-6">
+        <div class="col-md-2 col-6">
+            <div class="stat-card stat-card-info" style="cursor: pointer;" @onclick='() => Navigation.NavigateTo("/admin/students")'>
+                <div class="stat-card-bg"></div>
+                <div class="stat-card-inner">
+                    <div class="stat-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    </div>
+                    <div class="stat-info">
+                        <div class="stat-label">Students</div>
+                        <div class="stat-value">@totalStudents</div>
+                        <div class="stat-sub">@pendingRequests pending</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6">
             <div class="stat-card stat-card-primary">
                 <div class="stat-card-bg"></div>
                 <div class="stat-card-inner">
@@ -144,7 +160,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3 col-6">
+        <div class="col-md-2 col-6">
             <div class="stat-card stat-card-success">
                 <div class="stat-card-bg"></div>
                 <div class="stat-card-inner">
@@ -341,7 +357,10 @@
     private int activeShops;
     private int totalBoards;
     private int totalPrints;
+    private int totalStudents;
+    private int pendingRequests;
     private List<PrintLog>? recentLogs;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
     private Shop? selectedShop;
     private List<Shop> shops = new();
     private Dictionary<int, int> shopPrintCounts = new();
@@ -357,6 +376,10 @@
         totalBoards = await Db.EducationalBoards.CountAsync(b => b.IsActive);
         totalPrints = await PrintLogging.GetTotalPrintsAsync();
         recentLogs = await PrintLogging.GetRecentLogsAsync(5);
+        
+        var tenantId = TenantContext.TenantId;
+        totalStudents = await Db.StudentEnrollments.CountAsync(e => e.TenantId == tenantId && e.Status == EnrollmentStatus.Approved);
+        pendingRequests = await Db.StudentEnrollments.CountAsync(e => e.TenantId == tenantId && e.Status == EnrollmentStatus.Pending);
 
         shops = await Db.Shops.Where(s => s.IsActive).OrderBy(s => s.Name).ToListAsync<Shop>();
         var counts = await Db.PrintLogs

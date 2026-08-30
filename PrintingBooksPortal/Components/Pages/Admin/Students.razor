@@ -1,0 +1,321 @@
+@page "/admin/students"
+@attribute [Authorize(Roles = "Teacher,SystemAdmin")]
+@rendermode InteractiveServer
+@inject StudentService StudentSvc
+@inject AppDbContext Db
+@inject ITenantContext TenantContext
+@inject UserManager<ApplicationUser> UserManager
+@inject NavigationManager Navigation
+
+<div class="content-area">
+    <div class="page-header">
+        <div>
+            <h1>Students</h1>
+            <p class="page-subtitle">Manage student enrollments and book access</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert alert-modern alert-success">@message</div>
+    }
+
+    <!-- Pending Enrollments Section -->
+    @if (pendingEnrollments != null && pendingEnrollments.Any())
+    {
+        <div class="content-card mb-4 border-warning">
+            <div class="card-header bg-warning bg-opacity-10 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 text-warning-emphasis">Pending Enrollment Requests (@pendingEnrollments.Count)</h5>
+            </div>
+            <div class="table-container">
+                <table class="table table-modern mb-0">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Email</th>
+                            <th>Message</th>
+                            <th>Requested</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in pendingEnrollments)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@p.Student.FullName</td>
+                                <td>@p.Student.Email</td>
+                                <td class="text-muted">@(string.IsNullOrEmpty(p.StudentNote) ? "—" : p.StudentNote)</td>
+                                <td>@p.CreatedAt.ToLocalTime().ToString("d MMM yyyy")</td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-success me-2" @onclick="() => ApproveEnrollment(p.Id)">Approve</button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmReject(p)">Reject</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <!-- Approved Students Section -->
+    <div class="content-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Enrolled Students</h5>
+        </div>
+        
+        <div class="table-container">
+            <table class="table table-modern">
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th>Email</th>
+                        <th>Enrolled</th>
+                        <th>Books Granted</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (approvedStudents == null)
+                    {
+                        <tr><td colspan="5" class="text-center py-4">Loading...</td></tr>
+                    }
+                    else if (!approvedStudents.Any())
+                    {
+                        <tr><td colspan="5" class="text-center py-4 text-muted">No students enrolled yet.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var s in approvedStudents)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@s.Student.FullName</td>
+                                <td>@s.Student.Email</td>
+                                <td>@(s.ReviewedAt?.ToLocalTime().ToString("d MMM yyyy"))</td>
+                                <td>
+                                    <span class="badge bg-primary rounded-pill">@(studentAccessCounts.GetValueOrDefault(s.StudentUserId, 0))</span>
+                                </td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-primary" @onclick="() => ManageAccess(s.Student)">Manage Access</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@if (showRejectModal && selectedEnrollment != null)
+{
+    <div class="modal-overlay show">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">Reject Enrollment</h5>
+                <button type="button" class="modal-close" @onclick="() => showRejectModal = false">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to reject <strong>@selectedEnrollment.Student.FullName</strong>?</p>
+                <div class="mb-3">
+                    <label class="form-label">Reason (optional)</label>
+                    <textarea class="form-control" @bind="rejectionReason" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary" @onclick="() => showRejectModal = false">Cancel</button>
+                <button class="btn btn-danger" @onclick="RejectEnrollment">Reject</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showAccessModal && selectedStudent != null)
+{
+    <div class="modal-overlay show">
+        <div class="modal-container modal-lg">
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Books for @selectedStudent.FullName</h5>
+                <button type="button" class="modal-close" @onclick="() => showAccessModal = false">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                @if (tenantBooks == null)
+                {
+                    <p>Loading books...</p>
+                }
+                else
+                {
+                    <div class="d-flex justify-content-end mb-3">
+                        <button class="btn btn-sm btn-outline-success me-2" @onclick="GrantAll">Grant All</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="RevokeAll">Revoke All</button>
+                    </div>
+                    <div class="list-group">
+                        @foreach (var book in tenantBooks)
+                        {
+                            var hasAccess = activeAccessBookIds.Contains(book.Id);
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="fw-semibold">@book.Title</div>
+                                    <div class="small text-muted">@book.Board?.Name &bull; @book.PageCount pages</div>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" 
+                                           checked="@hasAccess" 
+                                           @onchange="(e) => ToggleAccess(book.Id, (bool)(e.Value ?? false))" />
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" @onclick="() => showAccessModal = false">Done</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<StudentEnrollment>? pendingEnrollments;
+    private List<StudentEnrollment>? approvedStudents;
+    private Dictionary<string, int> studentAccessCounts = new();
+    
+    private List<Book>? tenantBooks;
+    private HashSet<int> activeAccessBookIds = new();
+    
+    private StudentEnrollment? selectedEnrollment;
+    private ApplicationUser? selectedStudent;
+    
+    private string message = "";
+    private string rejectionReason = "";
+    
+    private bool showRejectModal = false;
+    private bool showAccessModal = false;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        int tenantId = TenantContext.TenantId;
+        
+        pendingEnrollments = await StudentSvc.ListPendingEnrollmentsAsync(tenantId);
+        
+        approvedStudents = await Db.StudentEnrollments
+            .Include(e => e.Student)
+            .Where(e => e.TenantId == tenantId && e.Status == EnrollmentStatus.Approved)
+            .OrderByDescending(e => e.ReviewedAt)
+            .ToListAsync();
+            
+        var accesses = await Db.StudentBookAccesses
+            .Where(a => a.TenantId == tenantId && a.IsActive)
+            .ToListAsync();
+            
+        studentAccessCounts = accesses
+            .GroupBy(a => a.StudentUserId)
+            .ToDictionary(g => g.Key, g => g.Count());
+            
+        tenantBooks = await Db.Books
+            .Include(b => b.Board)
+            .Where(b => b.TenantId == tenantId)
+            .OrderBy(b => b.Title)
+            .ToListAsync();
+    }
+
+    private async Task ApproveEnrollment(int id)
+    {
+        await StudentSvc.ApproveEnrollmentAsync(id, TenantContext.TenantId);
+        message = "Student enrollment approved.";
+        await LoadData();
+    }
+
+    private void ConfirmReject(StudentEnrollment e)
+    {
+        selectedEnrollment = e;
+        rejectionReason = "";
+        showRejectModal = true;
+    }
+
+    private async Task RejectEnrollment()
+    {
+        if (selectedEnrollment == null) return;
+        await StudentSvc.RejectEnrollmentAsync(selectedEnrollment.Id, TenantContext.TenantId, rejectionReason);
+        message = $"Enrollment rejected.";
+        showRejectModal = false;
+        selectedEnrollment = null;
+        await LoadData();
+    }
+    
+    private async Task ManageAccess(ApplicationUser student)
+    {
+        selectedStudent = student;
+        
+        var accesses = await Db.StudentBookAccesses
+            .Where(a => a.TenantId == TenantContext.TenantId && a.StudentUserId == student.Id && a.IsActive)
+            .Select(a => a.BookId)
+            .ToListAsync();
+            
+        activeAccessBookIds = accesses.ToHashSet();
+        showAccessModal = true;
+    }
+    
+    private async Task ToggleAccess(int bookId, bool grant)
+    {
+        if (selectedStudent == null) return;
+        var user = await UserManager.GetUserAsync(AuthState!.Result.User);
+        
+        if (grant)
+        {
+            await StudentSvc.GrantBookAccessAsync(selectedStudent.Id, bookId, TenantContext.TenantId, user!.Id);
+            activeAccessBookIds.Add(bookId);
+        }
+        else
+        {
+            await StudentSvc.RevokeBookAccessAsync(selectedStudent.Id, bookId, TenantContext.TenantId);
+            activeAccessBookIds.Remove(bookId);
+        }
+        
+        // Refresh counts
+        await LoadData();
+    }
+    
+    private async Task GrantAll()
+    {
+        if (selectedStudent == null || tenantBooks == null) return;
+        var user = await UserManager.GetUserAsync(AuthState!.Result.User);
+        
+        foreach (var book in tenantBooks)
+        {
+            if (!activeAccessBookIds.Contains(book.Id))
+            {
+                await StudentSvc.GrantBookAccessAsync(selectedStudent.Id, book.Id, TenantContext.TenantId, user!.Id);
+                activeAccessBookIds.Add(book.Id);
+            }
+        }
+        await LoadData();
+    }
+
+    private async Task RevokeAll()
+    {
+        if (selectedStudent == null || tenantBooks == null) return;
+        
+        foreach (var book in tenantBooks)
+        {
+            if (activeAccessBookIds.Contains(book.Id))
+            {
+                await StudentSvc.RevokeBookAccessAsync(selectedStudent.Id, book.Id, TenantContext.TenantId);
+                activeAccessBookIds.Remove(book.Id);
+            }
+        }
+        await LoadData();
+    }
+}

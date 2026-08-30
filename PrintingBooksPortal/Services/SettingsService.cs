@@ -49,6 +49,30 @@ public class SettingsService : ISettingsService
         }
     }
 
+    public async Task<bool> IsDeveloperToolsEnabledAsync()
+    {
+        try
+        {
+            return await GetBoolSettingAsync(SystemSettingKeys.DeveloperToolsEnabled, false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task SetDeveloperToolsEnabledAsync(bool enabled)
+    {
+        try
+        {
+            await SetBoolSettingAsync(SystemSettingKeys.DeveloperToolsEnabled, enabled);
+        }
+        catch
+        {
+            // Silently fail
+        }
+    }
+
     public async Task<string> GetWatermarkTextAsync()
     {
         try

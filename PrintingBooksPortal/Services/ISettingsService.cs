@@ -6,4 +6,6 @@ public interface ISettingsService
     Task SetWatermarkEnabledAsync(bool enabled);
     Task<string> GetWatermarkTextAsync();
     Task SetWatermarkTextAsync(string text);
+    Task<bool> IsDeveloperToolsEnabledAsync();
+    Task SetDeveloperToolsEnabledAsync(bool enabled);
 }

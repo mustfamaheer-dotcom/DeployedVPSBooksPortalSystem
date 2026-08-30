@@ -22,4 +22,5 @@ public static class SystemSettingKeys
 {
     public const string WatermarkEnabled = "WatermarkEnabled";
     public const string WatermarkText = "WatermarkText";
+    public const string DeveloperToolsEnabled = "DeveloperToolsEnabled";
 }

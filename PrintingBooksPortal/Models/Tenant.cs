@@ -26,4 +26,8 @@ public class Tenant
     public ICollection<SystemSetting> Settings { get; set; } = new List<SystemSetting>();
     public ICollection<ApplicationUser> Users { get; set; } = new List<ApplicationUser>();
     public ICollection<TenantApiKey> ApiKeys { get; set; } = new List<TenantApiKey>();
+
+    public ICollection<StudentEnrollment> StudentEnrollments { get; set; } = new List<StudentEnrollment>();
+    public ICollection<StudentBookAccess> StudentBookAccesses { get; set; } = new List<StudentBookAccess>();
+    public ICollection<RegistrationRequest> RegistrationRequests { get; set; } = new List<RegistrationRequest>();
 }

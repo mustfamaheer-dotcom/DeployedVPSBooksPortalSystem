@@ -78,6 +78,8 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("SystemAdminOnly", policy => policy.RequireRole("SystemAdmin"));
     options.AddPolicy("TenantAdmin",     policy => policy.RequireRole("Teacher", "SystemAdmin"));
     options.AddPolicy("TenantUser",      policy => policy.RequireRole("Teacher", "Shop"));
+    options.AddPolicy("StudentOnly",     policy => policy.RequireRole("Student"));
+    options.AddPolicy("BookshopOwner",   policy => policy.RequireRole("BookshopOwner"));
 });
 
 builder.Services.AddScoped<ITenantContext, TenantContext>();
@@ -90,6 +92,9 @@ builder.Services.AddSingleton<IPdfSecurityService, PdfSecurityService>();
 builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
 builder.Services.AddScoped<IPrinterRegistrationService, PrinterRegistrationService>();
 builder.Services.AddScoped<SystemAdminService>();
+builder.Services.AddScoped<PrinterRegistrationService>();
+builder.Services.AddScoped<RegistrationService>();
+builder.Services.AddScoped<StudentService>();
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddRazorComponents()

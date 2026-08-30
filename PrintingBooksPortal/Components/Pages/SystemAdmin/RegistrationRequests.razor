@@ -1,0 +1,243 @@
+@page "/sa/registrations"
+@attribute [Authorize(Roles = "SystemAdmin")]
+@rendermode InteractiveServer
+@inject RegistrationService Registration
+@inject UserManager<ApplicationUser> UserManager
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<div class="content-area">
+    <div class="page-header">
+        <div>
+            <h1>Registration Requests</h1>
+            <p class="page-subtitle">Review and approve new teachers and bookshops</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert alert-modern alert-success">@message</div>
+    }
+    @if (!string.IsNullOrEmpty(newApiKey))
+    {
+        <div class="alert-modern alert alert-warning key-alert">
+            <div class="fw-semibold">API key for the new bookshop (give to owner, shown only once):</div>
+            <div class="key-code-wrap">
+                <code class="key-code">@newApiKey</code>
+                <button class="btn btn-sm btn-outline-primary" @onclick="CopyNewKey">Copy</button>
+            </div>
+        </div>
+    }
+
+    <div class="content-card">
+        <div class="table-container">
+            <table class="table table-modern">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Organization</th>
+                        <th>Applicant Name</th>
+                        <th>Contact</th>
+                        <th>Date</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (requests == null)
+                    {
+                        <tr><td colspan="6" class="text-center py-4">Loading...</td></tr>
+                    }
+                    else if (!requests.Any())
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-muted">
+                                No pending registration requests
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var req in requests)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="badge @(req.Type == RegistrationType.Teacher ? "bg-primary" : "bg-info text-dark")">
+                                        @req.Type
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="fw-semibold text-dark">@req.OrganizationName</div>
+                                    @if (!string.IsNullOrEmpty(req.Address))
+                                    {
+                                        <div class="text-muted small">@req.Address</div>
+                                    }
+                                </td>
+                                <td>@req.ApplicantName</td>
+                                <td>
+                                    <div>@req.Email</div>
+                                    @if (!string.IsNullOrEmpty(req.Phone))
+                                    {
+                                        <div class="text-muted small">@req.Phone</div>
+                                    }
+                                </td>
+                                <td>@req.CreatedAt.ToLocalTime().ToString("d MMM yyyy")</td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-success me-2" @onclick="() => ConfirmApprove(req)">Approve</button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmReject(req)">Reject</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@if (showApproveModal && selectedReq != null)
+{
+    <div class="modal-overlay show">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h5 class="modal-title">Approve @selectedReq.Type Request</h5>
+                <button type="button" class="modal-close" @onclick="() => showApproveModal = false">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to approve <strong>@selectedReq.OrganizationName</strong>?</p>
+                <p class="text-muted small">
+                    This will create a new @(selectedReq.Type == RegistrationType.Teacher ? "tenant and Teacher account" : "shop and BookshopOwner account").
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary" @onclick="() => showApproveModal = false">Cancel</button>
+                <button class="btn btn-success" @onclick="Approve" disabled="@isProcessing">Approve</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showRejectModal && selectedReq != null)
+{
+    <div class="modal-overlay show">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">Reject Request</h5>
+                <button type="button" class="modal-close" @onclick="() => showRejectModal = false">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Reason for rejection (optional)</label>
+                    <textarea class="form-control" @bind="rejectionReason" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary" @onclick="() => showRejectModal = false">Cancel</button>
+                <button class="btn btn-danger" @onclick="Reject" disabled="@isProcessing">Reject</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<RegistrationRequest>? requests;
+    private RegistrationRequest? selectedReq;
+    private string message = "";
+    private string newApiKey = "";
+    private string rejectionReason = "";
+    private bool showApproveModal = false;
+    private bool showRejectModal = false;
+    private bool isProcessing = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRequests();
+    }
+
+    private async Task LoadRequests()
+    {
+        requests = await Registration.ListPendingAsync();
+    }
+
+    private void ConfirmApprove(RegistrationRequest req)
+    {
+        selectedReq = req;
+        showApproveModal = true;
+    }
+
+    private void ConfirmReject(RegistrationRequest req)
+    {
+        selectedReq = req;
+        rejectionReason = "";
+        showRejectModal = true;
+    }
+
+    private async Task Approve()
+    {
+        if (selectedReq == null) return;
+        isProcessing = true;
+        message = "";
+        newApiKey = "";
+
+        var user = await UserManager.GetUserAsync(Auth());
+
+        if (selectedReq.Type == RegistrationType.Teacher)
+        {
+            var result = await Registration.ApproveTeacherAsync(selectedReq.Id, user!.Id);
+            if (result != null)
+            {
+                message = $"Teacher {result.OrganizationName} approved successfully.";
+            }
+        }
+        else
+        {
+            var result = await Registration.ApproveBookshopAsync(selectedReq.Id, user!.Id);
+            if (result != null)
+            {
+                message = $"Bookshop {result.Value.Request.OrganizationName} approved successfully.";
+                newApiKey = result.Value.ApiKey;
+            }
+        }
+
+        showApproveModal = false;
+        selectedReq = null;
+        await LoadRequests();
+        isProcessing = false;
+    }
+
+    private async Task Reject()
+    {
+        if (selectedReq == null) return;
+        isProcessing = true;
+        message = "";
+        newApiKey = "";
+
+        var user = await UserManager.GetUserAsync(Auth());
+        
+        await Registration.RejectRequestAsync(selectedReq.Id, user!.Id, rejectionReason);
+        message = $"Request from {selectedReq.OrganizationName} was rejected.";
+        
+        showRejectModal = false;
+        selectedReq = null;
+        await LoadRequests();
+        isProcessing = false;
+    }
+
+    private async Task CopyNewKey()
+    {
+        if (!string.IsNullOrEmpty(newApiKey))
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", newApiKey);
+    }
+    
+    // Auth context helper
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+    
+    private System.Security.Claims.ClaimsPrincipal Auth() 
+    {
+        return AuthState?.Result.User ?? new System.Security.Claims.ClaimsPrincipal();
+    }
+}

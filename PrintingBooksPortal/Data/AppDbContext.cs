@@ -26,6 +26,9 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<PrintLog> PrintLogs => Set<PrintLog>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
     public DbSet<RegisteredPrinter> RegisteredPrinters => Set<RegisteredPrinter>();
+    public DbSet<RegistrationRequest> RegistrationRequests => Set<RegistrationRequest>();
+    public DbSet<StudentEnrollment> StudentEnrollments => Set<StudentEnrollment>();
+    public DbSet<StudentBookAccess> StudentBookAccesses => Set<StudentBookAccess>();
 
     // ── Tenant scoping on writes ──
     // Interactive circuits have no HttpContext; the tenant id is resolved from
@@ -34,7 +37,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     private static readonly HashSet<string> TenantScopedTypes = new()
     {
         nameof(Shop), nameof(EducationalBoard), nameof(Book),
-        nameof(ShopBookAssignment), nameof(PrintLog), nameof(SystemSetting), nameof(RegisteredPrinter)
+        nameof(ShopBookAssignment), nameof(PrintLog), nameof(SystemSetting), nameof(RegisteredPrinter),
+        nameof(StudentEnrollment), nameof(StudentBookAccess)
     };
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -146,6 +150,42 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<RegisteredPrinter>()
             .HasIndex(p => p.LastSeen);
 
+        // ── Student / Registration configuration ──
+        builder.Entity<RegistrationRequest>()
+            .HasIndex(r => r.Status);
+            
+        builder.Entity<StudentEnrollment>()
+            .HasIndex(e => new { e.StudentUserId, e.TenantId })
+            .IsUnique();
+            
+        builder.Entity<StudentEnrollment>()
+            .HasIndex(e => e.TenantId);
+            
+        builder.Entity<StudentBookAccess>()
+            .HasIndex(a => new { a.StudentUserId, a.BookId })
+            .IsUnique();
+
+        builder.Entity<StudentBookAccess>()
+            .HasIndex(a => a.TenantId);
+
+        builder.Entity<StudentBookAccess>()
+            .HasOne(a => a.Student)
+            .WithMany(u => u.BookAccesses)
+            .HasForeignKey(a => a.StudentUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<StudentBookAccess>()
+            .HasOne(a => a.GrantedByUser)
+            .WithMany()
+            .HasForeignKey(a => a.GrantedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<StudentEnrollment>()
+            .HasOne(e => e.Student)
+            .WithMany(u => u.Enrollments)
+            .HasForeignKey(e => e.StudentUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // ── global query filters (multi-tenancy on) ──
         // SystemAdmin (no TenantId) sees ALL tenants; regular users see only
         // their own (fail-closed: unauthenticated → TenantId 0 → nothing).
@@ -158,6 +198,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
             builder.Entity<PrintLog>().HasQueryFilter(e => e.TenantId == _tenantContext.TenantId || _tenantContext.IsSystemAdmin);
             builder.Entity<SystemSetting>().HasQueryFilter(e => e.TenantId == _tenantContext.TenantId || _tenantContext.IsSystemAdmin);
             builder.Entity<RegisteredPrinter>().HasQueryFilter(e => e.TenantId == _tenantContext.TenantId || _tenantContext.IsSystemAdmin);
+            builder.Entity<StudentEnrollment>().HasQueryFilter(e => e.TenantId == _tenantContext.TenantId || _tenantContext.IsSystemAdmin);
+            builder.Entity<StudentBookAccess>().HasQueryFilter(e => e.TenantId == _tenantContext.TenantId || _tenantContext.IsSystemAdmin);
         }
     }
 }

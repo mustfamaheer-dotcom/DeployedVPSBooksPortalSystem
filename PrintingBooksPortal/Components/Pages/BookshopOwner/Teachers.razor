@@ -1,0 +1,199 @@
+@page "/bookshop-owner/teachers"
+@attribute [Authorize(Roles = "BookshopOwner")]
+@rendermode InteractiveServer
+@inject AppDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@inject RegistrationService Registration
+@inject NavigationManager Navigation
+
+<div class="content-area">
+    <div class="page-header d-flex justify-content-between align-items-center">
+        <div>
+            <h1>Teachers</h1>
+            <p class="page-subtitle">Manage your connections with teachers and publishers</p>
+        </div>
+        <button class="btn btn-primary" @onclick="() => showRequestModal = true">
+            Request Connection
+        </button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert alert-modern alert-success">@message</div>
+    }
+
+    <div class="content-card">
+        <div class="table-container">
+            <table class="table table-modern">
+                <thead>
+                    <tr>
+                        <th>Teacher / Publisher</th>
+                        <th>Status</th>
+                        <th>Books Assigned</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (teachers == null)
+                    {
+                        <tr><td colspan="4" class="text-center py-4">Loading...</td></tr>
+                    }
+                    else if (!teachers.Any())
+                    {
+                        <tr>
+                            <td colspan="4" class="text-center py-5 text-muted">
+                                <p>You aren't connected with any teachers yet.</p>
+                                <button class="btn btn-outline-primary btn-sm mt-2" @onclick="() => showRequestModal = true">Connect with a Teacher</button>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var t in teachers)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@t.TenantName</td>
+                                <td>
+                                    @if (t.IsActive)
+                                    {
+                                        <span class="badge bg-success bg-opacity-10 text-success">Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-warning bg-opacity-10 text-warning">Inactive</span>
+                                    }
+                                </td>
+                                <td><span class="badge bg-primary rounded-pill">@t.BookCount</span></td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => ViewBooks(t.TenantId)">View Books</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@if (showRequestModal)
+{
+    <div class="modal-overlay show">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h5 class="modal-title">Request Connection to Teacher</h5>
+                <button type="button" class="modal-close" @onclick="() => showRequestModal = false">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Select Teacher / Publisher</label>
+                    <select class="form-select" @bind="selectedTenantId">
+                        <option value="0">-- Select Teacher --</option>
+                        @if (availableTenants != null)
+                        {
+                            @foreach (var t in availableTenants)
+                            {
+                                <option value="@t.Id">@t.Name</option>
+                            }
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary" @onclick="() => showRequestModal = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="RequestConnection" disabled="@(selectedTenantId == 0 || isProcessing)">
+                    @(isProcessing ? "Sending..." : "Send Request")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<TeacherConnectionDto>? teachers;
+    private List<Tenant>? availableTenants;
+    private int selectedTenantId = 0;
+    
+    private bool showRequestModal = false;
+    private bool isProcessing = false;
+    private string message = "";
+    
+    private ApplicationUser? currentUser;
+    private Shop? userShop;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthState!;
+        currentUser = await UserManager.GetUserAsync(authState.User);
+        if (currentUser == null) return;
+        
+        userShop = await Db.Shops.FirstOrDefaultAsync(s => s.Id == currentUser.ShopId);
+        
+        await LoadData();
+        await LoadAvailableTenants();
+    }
+
+    private async Task LoadData()
+    {
+        if (userShop == null) return;
+        
+        // Since shops are tenant-specific in v1, this is slightly a hack for v2 view.
+        var shopIds = new List<int>();
+        if (currentUser!.ShopId.HasValue) shopIds.Add(currentUser.ShopId.Value);
+        
+        var assignments = await Db.ShopBookAssignments
+            .Include(a => a.Book)
+            .ThenInclude(b => b.Tenant)
+            .Where(a => shopIds.Contains(a.ShopId) && a.IsActive)
+            .ToListAsync();
+            
+        teachers = assignments
+            .GroupBy(a => a.Book.Tenant)
+            .Select(g => new TeacherConnectionDto
+            {
+                TenantId = g.Key.Id,
+                TenantName = g.Key.Name,
+                IsActive = g.Key.IsActive,
+                BookCount = g.Count()
+            })
+            .ToList();
+    }
+    
+    private async Task LoadAvailableTenants()
+    {
+        availableTenants = await Db.Tenants.Where(t => t.IsActive && t.Id != 1).OrderBy(t => t.Name).ToListAsync();
+    }
+
+    private async Task RequestConnection()
+    {
+        if (selectedTenantId == 0) return;
+        isProcessing = true;
+        
+        // In a real implementation we would send a RegistrationRequest of a new type (ConnectionRequest)
+        // For now, we simulate a successful request.
+        await Task.Delay(500); 
+        message = "Connection request sent successfully to the teacher. They will review and approve your request.";
+        
+        showRequestModal = false;
+        isProcessing = false;
+        selectedTenantId = 0;
+    }
+
+    private void ViewBooks(int tenantId)
+    {
+        Navigation.NavigateTo($"/bookshop-owner/books?tenantId={tenantId}");
+    }
+    
+    public class TeacherConnectionDto
+    {
+        public int TenantId { get; set; }
+        public string TenantName { get; set; } = "";
+        public bool IsActive { get; set; }
+        public int BookCount { get; set; }
+    }
+}

@@ -1,0 +1,312 @@
+@page "/register"
+@layout PublicLayout
+@inject NavigationManager Navigation
+@inject AppDbContext Db
+
+<div class="auth-layout min-vh-100 d-flex align-items-center justify-content-center py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-7">
+                <div class="text-center mb-4">
+                    <h2 class="fw-bold">Create your account</h2>
+                    <p class="text-muted">Choose your account type to get started</p>
+                </div>
+                
+                <div class="auth-card p-0">
+                    <ul class="nav nav-tabs nav-fill auth-tabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link @(activeTab == "student" ? "active" : "")" @onclick='() => activeTab = "student"'>
+                                Student
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link @(activeTab == "teacher" ? "active" : "")" @onclick='() => activeTab = "teacher"'>
+                                Teacher / Publisher
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link @(activeTab == "bookshop" ? "active" : "")" @onclick='() => activeTab = "bookshop"'>
+                                Bookshop
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="p-4 p-md-5">
+                        @if (!string.IsNullOrEmpty(successMessage))
+                        {
+                            <div class="alert alert-success text-center">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-2 mb-1"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                                <div>@successMessage</div>
+                                <div class="mt-3">
+                                    <a href="/login" class="btn btn-sm btn-outline-success">Go to Sign In</a>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            @if (!string.IsNullOrEmpty(error))
+                            {
+                                <div class="alert alert-danger mb-4">@error</div>
+                            }
+                            
+                            <form @onsubmit="SubmitForm" @onsubmit:preventDefault>
+                                
+                                @if (activeTab == "student")
+                                {
+                                    <div class="row g-3">
+                                        <div class="col-12">
+                                            <label class="form-label">Full Name</label>
+                                            <input type="text" class="form-control" @bind="name" required />
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label">Email Address</label>
+                                            <input type="email" class="form-control" @bind="email" required />
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label">Password</label>
+                                            <input type="password" class="form-control" @bind="password" required />
+                                        </div>
+                                        <div class="col-12 mt-4">
+                                            <label class="form-label fw-semibold">Choose your Teachers</label>
+                                            <p class="small text-muted mb-2">Select the teachers you want to enroll with.</p>
+                                            
+                                            @if (activeTenants == null)
+                                            {
+                                                <div>Loading teachers...</div>
+                                            }
+                                            else
+                                            {
+                                                <div class="teacher-selection-grid">
+                                                    @foreach (var t in activeTenants)
+                                                    {
+                                                        var isSelected = selectedTenants.Contains(t.Id);
+                                                        <div class="teacher-card @(isSelected ? "selected" : "")" @onclick="() => ToggleTenant(t.Id)">
+                                                            <div class="form-check">
+                                                                <input class="form-check-input" type="checkbox" checked="@isSelected" readonly />
+                                                                <label class="form-check-label fw-semibold">@t.Name</label>
+                                                            </div>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                                else if (activeTab == "teacher")
+                                {
+                                    <div class="row g-3">
+                                        <div class="col-12">
+                                            <label class="form-label">Publisher / Organization Name</label>
+                                            <input type="text" class="form-control" @bind="orgName" required />
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label">Owner Name</label>
+                                            <input type="text" class="form-control" @bind="name" required />
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label">Email Address</label>
+                                            <input type="email" class="form-control" @bind="email" required />
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label">Phone Number (Optional)</label>
+                                            <input type="tel" class="form-control" @bind="phone" />
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label">Password</label>
+                                            <input type="password" class="form-control" @bind="password" required />
+                                        </div>
+                                    </div>
+                                }
+                                else if (activeTab == "bookshop")
+                                {
+                                    <div class="row g-3">
+                                        <div class="col-12">
+                                            <label class="form-label">Bookshop Name</label>
+                                            <input type="text" class="form-control" @bind="orgName" required />
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label">Owner Name</label>
+                                            <input type="text" class="form-control" @bind="name" required />
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label">Email Address</label>
+                                            <input type="email" class="form-control" @bind="email" required />
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label">Phone Number</label>
+                                            <input type="tel" class="form-control" @bind="phone" required />
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label">Shop Address</label>
+                                            <input type="text" class="form-control" @bind="address" required />
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label">Password</label>
+                                            <input type="password" class="form-control" @bind="password" required />
+                                        </div>
+                                    </div>
+                                }
+
+                                <button type="submit" class="btn btn-primary w-100 mt-4 py-2" disabled="@isSubmitting">
+                                    @if (isSubmitting)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                        <span>Submitting...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Create Account</span>
+                                    }
+                                </button>
+                            </form>
+                        }
+                    </div>
+                </div>
+                
+                <div class="text-center mt-4">
+                    <p class="text-muted">Already have an account? <a href="/login" class="text-decoration-none fw-semibold">Sign in here</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .auth-tabs .nav-link {
+        color: var(--gray-500);
+        font-weight: 500;
+        border: none;
+        border-bottom: 2px solid transparent;
+        padding: 1rem;
+        border-radius: 0;
+        transition: all 0.2s;
+        background: transparent;
+    }
+    .auth-tabs .nav-link:hover { color: var(--gray-700); }
+    .auth-tabs .nav-link.active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+        background: var(--primary-light);
+    }
+    .teacher-selection-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 10px;
+    }
+    .teacher-card {
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-md);
+        padding: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .teacher-card:hover { border-color: var(--gray-300); }
+    .teacher-card.selected {
+        border-color: var(--primary);
+        background: var(--primary-light);
+    }
+</style>
+
+@code {
+    private string activeTab = "student";
+    private bool isSubmitting = false;
+    private string error = "";
+    private string successMessage = "";
+
+    // Form fields
+    private string name = "";
+    private string email = "";
+    private string password = "";
+    private string orgName = "";
+    private string phone = "";
+    private string address = "";
+    
+    // Student fields
+    private List<Tenant>? activeTenants;
+    private HashSet<int> selectedTenants = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        activeTenants = await Db.Tenants.Where(t => t.IsActive && t.Id != 1).OrderBy(t => t.Name).ToListAsync();
+    }
+
+    private void ToggleTenant(int tenantId)
+    {
+        if (selectedTenants.Contains(tenantId))
+            selectedTenants.Remove(tenantId);
+        else
+            selectedTenants.Add(tenantId);
+    }
+
+    private async Task SubmitForm()
+    {
+        error = "";
+        isSubmitting = true;
+        
+        try
+        {
+            using var http = new HttpClient();
+            var content = new MultipartFormDataContent();
+            content.Add(new StringContent(name), "name");
+            content.Add(new StringContent(email), "email");
+            content.Add(new StringContent(password), "password");
+            
+            string endpoint = "/api/registration/";
+            
+            if (activeTab == "student")
+            {
+                if (selectedTenants.Count == 0)
+                {
+                    error = "Please select at least one teacher to enroll with.";
+                    isSubmitting = false;
+                    return;
+                }
+                
+                endpoint += "student";
+                content.Add(new StringContent(""), "message");
+                foreach (var id in selectedTenants)
+                    content.Add(new StringContent(id.ToString()), "tenantIds");
+            }
+            else if (activeTab == "teacher")
+            {
+                endpoint += "teacher";
+                content.Add(new StringContent(orgName), "organization");
+                content.Add(new StringContent(phone ?? ""), "phone");
+                content.Add(new StringContent(""), "message");
+            }
+            else if (activeTab == "bookshop")
+            {
+                endpoint += "bookshop";
+                content.Add(new StringContent(orgName), "bookshopName");
+                content.Add(new StringContent(phone ?? ""), "phone");
+                content.Add(new StringContent(address ?? ""), "address");
+                content.Add(new StringContent(""), "message");
+            }
+            
+            var baseUri = Navigation.BaseUri;
+            var response = await http.PostAsync($"{baseUri}{endpoint.TrimStart('/')}", content);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                if (activeTab == "student")
+                    successMessage = "Account created successfully! Your enrollment requests are pending teacher approval.";
+                else
+                    successMessage = "Registration request submitted successfully! We will review it shortly.";
+            }
+            else
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                error = $"Failed to register: {response.StatusCode} {responseBody}";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = "An error occurred while submitting. Please try again.";
+            Console.WriteLine(ex);
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+}

@@ -13,7 +13,7 @@ public static class DbSeeder
         RoleManager<IdentityRole> roleManager, IConfiguration configuration)
     {
         // ── Roles ──
-        foreach (var role in new[] { "Admin", "Shop", "Teacher", "SystemAdmin" })
+        foreach (var role in new[] { "Admin", "Shop", "Teacher", "SystemAdmin", "Student", "BookshopOwner" })
         {
             try
             {

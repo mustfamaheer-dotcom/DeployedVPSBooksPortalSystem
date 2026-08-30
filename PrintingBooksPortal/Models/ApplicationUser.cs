@@ -10,4 +10,8 @@ public class ApplicationUser : IdentityUser
     public string? FullName { get; set; }
     public Shop? Shop { get; set; }
     public Tenant? Tenant { get; set; }
+
+    public bool IsStudent { get; set; }
+    public ICollection<StudentEnrollment> Enrollments { get; set; } = new List<StudentEnrollment>();
+    public ICollection<StudentBookAccess> BookAccesses { get; set; } = new List<StudentBookAccess>();
 }

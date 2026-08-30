@@ -1,4 +1,4 @@
-﻿@inject NavigationManager Navigation
+@inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthState
 @implements IDisposable
 
@@ -104,6 +104,7 @@
             new("Boards", "/admin/boards", SvgIcons.Boards),
             new("Books", "/admin/books", SvgIcons.Books),
             new("Shops", "/admin/shops", SvgIcons.Shops),
+            new("Students", "/admin/students", SvgIcons.Users),
             new("Book Access", "/admin/assignments", SvgIcons.BookAccess),
             new("Analytics", "/admin/analytics", SvgIcons.Analytics),
             new("Settings", "/admin/settings", SvgIcons.Settings),
@@ -115,6 +116,7 @@
         new("SystemAdmin",
         [
             new("Platform Dashboard", "/sa/dashboard", SvgIcons.Dashboard),
+            new("Registrations", "/sa/registrations", SvgIcons.Users),
             new("Teachers", "/sa/teachers", SvgIcons.Users),
             new("Platform Analytics", "/sa/analytics", SvgIcons.Analytics),
         ]),
@@ -122,6 +124,17 @@
         [
             new("My Books", "/shop/mybooks", SvgIcons.Books),
             new("Print History", "/shop/history", SvgIcons.History),
+        ]),
+        new("Student",
+        [
+            new("Dashboard", "/student/dashboard", SvgIcons.Dashboard),
+        ]),
+        new("BookshopOwner",
+        [
+            new("Dashboard", "/bookshop-owner/dashboard", SvgIcons.Dashboard),
+            new("Teachers", "/bookshop-owner/teachers", SvgIcons.Users),
+            new("My Books", "/bookshop-owner/books", SvgIcons.Books),
+            new("Print History", "/bookshop-owner/history", SvgIcons.History),
         ]),
     ];
 
