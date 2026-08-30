@@ -237,6 +237,7 @@
             </div>
         </div>
     </div>
+@if (showAddBookmarkModal)
 {
     <div class="modal-overlay show">
         <div class="modal-container">
@@ -329,10 +330,13 @@
         }
     }
 
+    private bool _jsInitialized = false;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && hasAccess)
+        if (hasAccess && !_jsInitialized)
         {
+            _jsInitialized = true;
             _dotNetRef = DotNetObjectReference.Create(this);
             var pdfUrl = $"/api/student/view/{BookId}";
             var storageKey = $"bp_annotations_{userId}_{BookId}";

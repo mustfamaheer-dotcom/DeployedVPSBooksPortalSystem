@@ -41,9 +41,17 @@ window.studentAnnotations = {
             this.scale = 1.5;
         }
         this.canvas = document.getElementById('pdf-canvas');
+        if (!this.canvas) {
+            console.error("studentAnnotations.init: pdf-canvas not found in DOM");
+            return;
+        }
         this.ctx = this.canvas.getContext('2d');
         
         this.annotCanvas = document.getElementById('annotation-canvas');
+        if (!this.annotCanvas) {
+            console.error("studentAnnotations.init: annotation-canvas not found in DOM");
+            return;
+        }
         this.annotCtx = this.annotCanvas.getContext('2d');
         
         this.loadAnnotations(serverAnnotationsJson);
