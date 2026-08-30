@@ -26,6 +26,14 @@
     <script src="@Assets["js/antiTamper.js"]"></script>
     <script src="@Assets["js/toasts.js"]"></script>
     <script src="@Assets["js/copy.js"]"></script>
+    
+    <!-- PDF Viewer and Annotations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        // Ensure pdfjsLib is available
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    <script src="@Assets["js/student-annotations.js"]"></script>
 </body>
 
 </html>
