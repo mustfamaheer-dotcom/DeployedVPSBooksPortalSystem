@@ -5,9 +5,12 @@
 @inject UserManager<ApplicationUser> UserManager
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@implements IAsyncDisposable
 
-<div class="student-viewer-layout">
-    <div class="viewer-header-dark d-flex flex-wrap justify-content-between align-items-center px-3 px-md-4 py-2 gap-3 shadow-sm">
+<div class="student-viewer-layout @(isReadingMode ? "reading-mode" : "")">
+    @if (!isReadingMode)
+    {
+        <div class="viewer-header-dark d-flex flex-wrap justify-content-between align-items-center px-3 px-md-4 py-2 gap-3 shadow-sm">
         <div class="d-flex align-items-center gap-3" style="min-width: 0; flex: 1;">
             <button class="btn btn-light btn-sm btn-icon rounded-3 flex-shrink-0" @onclick="GoBack" title="Back">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
@@ -51,13 +54,13 @@
                 Text
             </button>
             
-            <button class="tool-btn outline" title="Eraser" onclick="studentAnnotations.setTool('eraser')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-                Erase
-            </button>
-            
             <button class="tool-btn btn-danger-soft ms-md-2" onclick="studentAnnotations.clearAll()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                 Clear All
+            </button>
+            <button class="tool-btn ms-2" @onclick="ToggleBookmarksPanel" title="Bookmarks">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                Bookmarks
             </button>
 
             <button class="btn btn-primary btn-sm px-3 ms-1 fw-medium shadow-sm d-flex align-items-center gap-1" onclick="studentAnnotations.saveAnnotations()">
@@ -66,22 +69,79 @@
             </button>
         </div>
     </div>
+    }
 
-    <div class="viewer-container bg-light">
-        @if (hasAccess)
+    @if (!isReadingMode)
+    {
+        <div class="d-flex w-100" style="flex: 1; min-height: 0; position: relative;">
+            <!-- Bookmarks Panel -->
+            @if (showBookmarks)
         {
-            <!-- PDF Viewer iframe or canvas -->
-            <div id="pdf-container" style="position: relative; margin: 0 auto; width: 100%; max-width: 100%; padding: 10px; overflow-x: auto;">
-                <div id="pdf-loading-spinner" class="position-absolute top-50 start-50 translate-middle text-center" style="z-index: 20;">
-                    <div class="spinner-border text-primary mb-2" role="status"></div>
-                    <div class="fw-medium text-muted">Loading Document...</div>
+            <div class="bg-light border-end d-flex flex-column shadow-sm" style="width: 280px; z-index: 10;">
+                <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-semibold">Bookmarks</h6>
+                    <button class="btn btn-sm btn-outline-primary py-1 px-2" @onclick="AddBookmark">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        Add Page
+                    </button>
                 </div>
-                <canvas id="pdf-canvas" class="shadow"></canvas>
-                <!-- Annotation layer overlaid on top of the PDF canvas -->
-                <canvas id="annotation-canvas" style="position: absolute; top: 10px; left: 10px; cursor: crosshair; z-index: 10;"></canvas>
+                <div class="list-group list-group-flush overflow-auto" style="flex: 1;">
+                    @if (bookmarks == null)
+                    {
+                        <div class="p-3 text-center text-muted">Loading...</div>
+                    }
+                    else if (!bookmarks.Any())
+                    {
+                        <div class="p-4 text-center text-muted small">No bookmarks yet.</div>
+                    }
+                    else
+                    {
+                        @foreach (var b in bookmarks.OrderBy(x => x.PageNumber))
+                        {
+                            <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                <button class="btn btn-link text-dark p-0 text-decoration-none text-start flex-grow-1" @onclick="() => NavigateToPage(b.PageNumber)">
+                                    <div class="fw-medium">Page @b.PageNumber</div>
+                                    @if (!string.IsNullOrEmpty(b.Label))
+                                    {
+                                        <div class="small text-muted text-truncate" style="max-width: 180px;">@b.Label</div>
+                                    }
+                                </button>
+                                <button class="btn btn-link text-danger p-0 ms-2" @onclick="() => RemoveBookmark(b.Id)" title="Remove">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                </button>
+                            </div>
+                        }
+                    }
+                </div>
             </div>
+        }
+        
+        <div class="viewer-container bg-light w-100" style="position: relative;">
+            @if (hasAccess)
+            {
+                <!-- PDF Viewer iframe or canvas -->
+                <div id="pdf-container" style="position: relative; margin: 0 auto; width: 100%; max-width: 100%; padding: 10px; overflow-x: auto; height: 100%;">
+                    <div id="pdf-loading-spinner" class="position-absolute top-50 start-50 translate-middle text-center" style="z-index: 20;">
+                        <div class="spinner-border text-primary mb-2" role="status"></div>
+                        <div class="fw-medium text-muted">Loading Document...</div>
+                    </div>
+                    <canvas id="pdf-canvas" class="shadow"></canvas>
+                    <!-- Annotation layer overlaid on top of the PDF canvas -->
+                    <canvas id="annotation-canvas" style="position: absolute; top: 10px; left: 10px; cursor: crosshair; z-index: 10;"></canvas>
+                </div>
             
-            <div class="viewer-controls position-fixed bottom-0 start-50 translate-middle-x mb-4 bg-white rounded-pill shadow px-3 py-2 d-flex align-items-center gap-2 gap-md-3">
+            <div class="viewer-controls position-fixed bottom-0 start-50 translate-middle-x mb-4 bg-white rounded-pill shadow px-3 py-2 d-flex align-items-center gap-2 gap-md-3" style="z-index: 1000; opacity: @(isReadingMode ? "0.6" : "1"); transition: opacity 0.3s;" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='@(isReadingMode ? "0.6" : "1")'">
+                <button class="btn btn-sm btn-light rounded-circle flex-shrink-0" @onclick="ToggleReadingMode" title="Toggle Reading Mode">
+                    @if (isReadingMode)
+                    {
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path></svg>
+                    }
+                    else
+                    {
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                    }
+                </button>
+                <div class="border-start ms-1 me-1 h-100" style="min-height: 24px;"></div>
                 <button class="btn btn-sm btn-light rounded-circle flex-shrink-0" onclick="studentAnnotations.zoomOut()" title="Zoom Out">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </button>
@@ -101,15 +161,64 @@
         else
         {
             <div class="d-flex h-100 justify-content-center align-items-center">
-                <div class="text-center text-muted">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mb-3"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <div class="text-center p-5 bg-white rounded shadow-sm">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="1.5" class="mb-3"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                     <h4>Access Denied</h4>
-                    <p>You do not have access to this book.</p>
+                    <p class="text-muted">You don't have access to this book.</p>
+                    <button class="btn btn-primary mt-3" @onclick="GoBack">Return to Dashboard</button>
                 </div>
             </div>
         }
-    </div>
-    
+        </div>
+        </div>
+    }
+    else
+    {
+        <div class="viewer-container bg-light w-100" style="position: relative; height: 100vh;">
+            @if (hasAccess)
+            {
+                <!-- PDF Viewer iframe or canvas -->
+                <div id="pdf-container" style="position: relative; margin: 0 auto; width: 100%; max-width: 100%; padding: 10px; overflow-x: auto; height: 100%;">
+                    <div id="pdf-loading-spinner" class="position-absolute top-50 start-50 translate-middle text-center" style="z-index: 20;">
+                        <div class="spinner-border text-primary mb-2" role="status"></div>
+                        <div class="fw-medium text-muted">Loading Document...</div>
+                    </div>
+                    <canvas id="pdf-canvas" class="shadow"></canvas>
+                    <!-- Annotation layer overlaid on top of the PDF canvas -->
+                    <canvas id="annotation-canvas" style="position: absolute; top: 10px; left: 10px; cursor: crosshair; z-index: 10;"></canvas>
+                </div>
+            
+                <div class="viewer-controls position-fixed bottom-0 start-50 translate-middle-x mb-4 bg-white rounded-pill shadow px-3 py-2 d-flex align-items-center gap-2 gap-md-3" style="z-index: 1000; opacity: @(isReadingMode ? "0.6" : "1"); transition: opacity 0.3s;" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='@(isReadingMode ? "0.6" : "1")'">
+                    <button class="btn btn-sm btn-light rounded-circle flex-shrink-0" @onclick="ToggleReadingMode" title="Toggle Reading Mode">
+                        @if (isReadingMode)
+                        {
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path></svg>
+                        }
+                        else
+                        {
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                        }
+                    </button>
+                    <div class="border-start ms-1 me-1 h-100" style="min-height: 24px;"></div>
+                    <button class="btn btn-sm btn-light rounded-circle flex-shrink-0" onclick="studentAnnotations.zoomOut()" title="Zoom Out">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </button>
+                    <button class="btn btn-sm btn-light rounded-circle flex-shrink-0" onclick="studentAnnotations.zoomIn()" title="Zoom In">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </button>
+                    <div class="border-start ms-1 me-1 h-100" style="min-height: 24px;"></div>
+                    <button class="btn btn-sm btn-light rounded-circle flex-shrink-0" onclick="studentAnnotations.prevPage()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    </button>
+                    <span class="fw-semibold text-nowrap" style="font-size: 0.9rem;">Page <span id="page-num">1</span> / <span id="page-count">--</span></span>
+                    <button class="btn btn-sm btn-light rounded-circle flex-shrink-0" onclick="studentAnnotations.nextPage()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                </div>
+            }
+        </div>
+    }
+</div>
     <!-- Custom Text Note Modal -->
     <div class="modal fade" id="textNoteModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -128,7 +237,29 @@
             </div>
         </div>
     </div>
-</div>
+{
+    <div class="modal-overlay show">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Bookmark</h5>
+                <button type="button" class="modal-close" @onclick="() => showAddBookmarkModal = false">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Bookmark page @lastPageRead?</p>
+                <div class="mb-3">
+                    <label class="form-label">Note (optional)</label>
+                    <input type="text" class="form-control" @bind="newBookmarkNote" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary" @onclick="() => showAddBookmarkModal = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="SaveBookmark">Save Bookmark</button>
+            </div>
+        </div>
+    </div>
+}
 
 
 @code {
@@ -139,6 +270,17 @@
     private string bookTitle = "";
     private int tenantId = 0;
     private string userId = "";
+    private int lastPageRead = 1;
+    private int totalPages = 1;
+    private string serverAnnotationsJson = "";
+    
+    private bool showBookmarks = false;
+    private bool showAddBookmarkModal = false;
+    private bool isReadingMode = false;
+    private string newBookmarkNote = "";
+    private List<StudentBookmark>? bookmarks;
+
+    private DotNetObjectReference<Viewer>? _dotNetRef;
 
     [CascadingParameter]
     private Task<AuthenticationState>? AuthState { get; set; }
@@ -163,6 +305,27 @@
             hasAccess = true;
             bookTitle = access.Book.Title;
             tenantId = access.TenantId;
+            totalPages = access.Book.PageCount > 0 ? access.Book.PageCount : 1;
+
+            var progress = await db.StudentReadingProgresses
+                .FirstOrDefaultAsync(p => p.StudentUserId == userId && p.BookId == BookId);
+            
+            if (progress != null && progress.LastPageRead > 0)
+            {
+                lastPageRead = progress.LastPageRead;
+            }
+            
+            var annotRecord = await db.StudentAnnotationRecords
+                .FirstOrDefaultAsync(a => a.StudentUserId == userId && a.BookId == BookId);
+                
+            if (annotRecord != null && !string.IsNullOrEmpty(annotRecord.AnnotationData))
+            {
+                serverAnnotationsJson = annotRecord.AnnotationData;
+            }
+            
+            bookmarks = await db.StudentBookmarks
+                .Where(b => b.StudentUserId == userId && b.BookId == BookId)
+                .ToListAsync();
         }
     }
 
@@ -170,12 +333,144 @@
     {
         if (firstRender && hasAccess)
         {
-            // Initialize the viewer with the secure URL and the unique ID for localStorage
+            _dotNetRef = DotNetObjectReference.Create(this);
             var pdfUrl = $"/api/student/view/{BookId}";
             var storageKey = $"bp_annotations_{userId}_{BookId}";
             
-            await JS.InvokeVoidAsync("studentAnnotations.init", pdfUrl, storageKey);
+            await JS.InvokeVoidAsync("studentAnnotations.init", pdfUrl, storageKey, lastPageRead, _dotNetRef, serverAnnotationsJson);
         }
+    }
+
+    [JSInvokable]
+    public async Task OnPageChanged(int pageNum)
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        
+        var progress = await db.StudentReadingProgresses
+            .FirstOrDefaultAsync(p => p.StudentUserId == userId && p.BookId == BookId);
+            
+        if (progress == null)
+        {
+            db.StudentReadingProgresses.Add(new StudentReadingProgress
+            {
+                StudentUserId = userId,
+                BookId = BookId,
+                TenantId = tenantId,
+                LastPageRead = pageNum,
+                TotalPages = totalPages,
+                LastReadAt = DateTime.UtcNow
+            });
+        }
+        else
+        {
+            progress.LastPageRead = pageNum;
+            progress.LastReadAt = DateTime.UtcNow;
+            if (progress.TotalPages == 0 && totalPages > 0)
+                progress.TotalPages = totalPages;
+        }
+        
+        await db.SaveChangesAsync();
+    }
+    
+    [JSInvokable]
+    public async Task SyncAnnotations(string jsonData)
+    {
+        if (string.IsNullOrEmpty(jsonData)) return;
+        
+        using var scope = ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        
+        var record = await db.StudentAnnotationRecords
+            .FirstOrDefaultAsync(a => a.StudentUserId == userId && a.BookId == BookId);
+            
+        if (record == null)
+        {
+            record = new StudentAnnotationRecord
+            {
+                StudentUserId = userId,
+                BookId = BookId,
+                TenantId = tenantId,
+                AnnotationData = jsonData,
+                LastSavedAt = DateTime.UtcNow
+            };
+            db.StudentAnnotationRecords.Add(record);
+        }
+        else
+        {
+            record.AnnotationData = jsonData;
+            record.LastSavedAt = DateTime.UtcNow;
+        }
+        
+        await db.SaveChangesAsync();
+    }
+    
+    private void ToggleReadingMode()
+    {
+        isReadingMode = !isReadingMode;
+        if (isReadingMode) showBookmarks = false;
+        
+        JS.InvokeVoidAsync("studentAnnotations.queueRenderPage", lastPageRead);
+    }
+    
+    private void ToggleBookmarksPanel()
+    {
+        showBookmarks = !showBookmarks;
+    }
+    
+    private void AddBookmark()
+    {
+        newBookmarkNote = "";
+        showAddBookmarkModal = true;
+    }
+    
+    private async Task SaveBookmark()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        
+        var bookmark = new StudentBookmark
+        {
+            StudentUserId = userId,
+            BookId = BookId,
+            TenantId = tenantId,
+            PageNumber = lastPageRead,
+            Label = newBookmarkNote,
+            CreatedAt = DateTime.UtcNow
+        };
+        
+        db.StudentBookmarks.Add(bookmark);
+        await db.SaveChangesAsync();
+        
+        if (bookmarks == null) bookmarks = new();
+        bookmarks.Add(bookmark);
+        
+        showAddBookmarkModal = false;
+    }
+    
+    private async Task RemoveBookmark(int id)
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        
+        var bookmark = await db.StudentBookmarks.FindAsync(id);
+        if (bookmark != null && bookmark.StudentUserId == userId)
+        {
+            db.StudentBookmarks.Remove(bookmark);
+            await db.SaveChangesAsync();
+            
+            if (bookmarks != null)
+            {
+                bookmarks.RemoveAll(b => b.Id == id);
+            }
+        }
+    }
+    
+    private async Task NavigateToPage(int page)
+    {
+        // We can update the lastPageRead, and then tell JS to jump
+        lastPageRead = page;
+        await JS.InvokeVoidAsync("studentAnnotations.queueRenderPage", page);
     }
 
     private void GoBack()
@@ -184,5 +479,11 @@
             Navigation.NavigateTo($"/student/books/{tenantId}");
         else
             Navigation.NavigateTo("/student/dashboard");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _dotNetRef?.Dispose();
+        await Task.CompletedTask;
     }
 }

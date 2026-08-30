@@ -1,0 +1,191 @@
+@page "/admin/announcements"
+@attribute [Authorize(Policy = "TenantAdmin")]
+@rendermode InteractiveServer
+@inject PrintingBooksPortal.Data.AppDbContext Db
+@inject ITenantContext TenantContext
+@inject AuthenticationStateProvider AuthState
+@inject PrintingBooksPortal.Services.NotificationService Notifications
+
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1>Announcements</h1>
+        <p class="page-subtitle">Broadcast messages to all your students.</p>
+    </div>
+    <button class="btn btn-primary d-flex align-items-center" @onclick="() => showCreateModal = true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Announcement
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @message
+        <button type="button" class="btn-close" @onclick="() => message = null" aria-label="Close"></button>
+    </div>
+}
+
+<div class="content-card">
+    @if (announcements == null)
+    {
+        <div class="p-5 text-center text-muted">Loading announcements...</div>
+    }
+    else if (!announcements.Any())
+    {
+        <div class="empty-state py-5">
+            <div class="empty-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <h5 class="mb-2">No Announcements</h5>
+            <p class="text-muted">You haven't made any announcements yet.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Title</th>
+                        <th>Created</th>
+                        <th>Status</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var a in announcements)
+                    {
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">@a.Title</div>
+                                <div class="text-muted small text-truncate" style="max-width: 300px;">@a.Body</div>
+                            </td>
+                            <td>@a.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")</td>
+                            <td>
+                                @if (a.IsActive)
+                                {
+                                    <span class="badge bg-success bg-opacity-10 text-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary bg-opacity-10 text-secondary">Inactive</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleActive(a)">
+                                    @(a.IsActive ? "Deactivate" : "Activate")
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@if (showCreateModal)
+{
+    <div class="modal-overlay show">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h5 class="modal-title">New Announcement</h5>
+                <button type="button" class="modal-close" @onclick="() => showCreateModal = false">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Title</label>
+                    <input type="text" class="form-control" @bind="newTitle" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Message</label>
+                    <textarea class="form-control" rows="4" @bind="newMessage"></textarea>
+                </div>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="notifyStudents" @bind="notifyStudents" />
+                    <label class="form-check-label" for="notifyStudents">
+                        Send a push notification to all enrolled students
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary" @onclick="() => showCreateModal = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="CreateAnnouncement" disabled="@(string.IsNullOrWhiteSpace(newTitle) || string.IsNullOrWhiteSpace(newMessage))">Post Announcement</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<PrintingBooksPortal.Models.TeacherAnnouncement>? announcements;
+    private string? message;
+    
+    private bool showCreateModal = false;
+    private string newTitle = "";
+    private string newMessage = "";
+    private bool notifyStudents = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        announcements = await Db.TeacherAnnouncements
+            .Where(a => a.TenantId == TenantContext.TenantId)
+            .OrderByDescending(a => a.CreatedAt)
+            .ToListAsync();
+    }
+
+    private async Task ToggleActive(PrintingBooksPortal.Models.TeacherAnnouncement a)
+    {
+        a.IsActive = !a.IsActive;
+        await Db.SaveChangesAsync();
+        message = $"Announcement {(a.IsActive ? "activated" : "deactivated")}.";
+        await LoadData();
+    }
+
+    private async Task CreateAnnouncement()
+    {
+        if (string.IsNullOrWhiteSpace(newTitle) || string.IsNullOrWhiteSpace(newMessage)) return;
+        
+        var state = await AuthState.GetAuthenticationStateAsync();
+        var userId = state.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        
+        var ann = new PrintingBooksPortal.Models.TeacherAnnouncement
+        {
+            TenantId = TenantContext.TenantId,
+            Title = newTitle,
+            Body = newMessage,
+            CreatedAt = DateTime.UtcNow,
+            IsActive = true
+        };
+        
+        Db.TeacherAnnouncements.Add(ann);
+        await Db.SaveChangesAsync();
+        
+        if (notifyStudents)
+        {
+            var studentIds = await Db.StudentEnrollments
+                .Where(e => e.TenantId == TenantContext.TenantId && e.Status == PrintingBooksPortal.Models.EnrollmentStatus.Approved)
+                .Select(e => e.StudentUserId)
+                .ToListAsync();
+                
+            foreach (var sId in studentIds)
+            {
+                await Notifications.NotifyAsync(sId, $"New Announcement: {newTitle}", newMessage, PrintingBooksPortal.Models.NotificationType.Announcement);
+            }
+        }
+        
+        message = "Announcement posted successfully.";
+        showCreateModal = false;
+        newTitle = "";
+        newMessage = "";
+        notifyStudents = true;
+        
+        await LoadData();
+    }
+}

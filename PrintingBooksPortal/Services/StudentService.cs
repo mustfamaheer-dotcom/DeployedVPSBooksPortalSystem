@@ -9,11 +9,13 @@ public class StudentService
 {
     private readonly AppDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly NotificationService _notifications;
 
-    public StudentService(AppDbContext db, UserManager<ApplicationUser> userManager)
+    public StudentService(AppDbContext db, UserManager<ApplicationUser> userManager, NotificationService notifications)
     {
         _db = db;
         _userManager = userManager;
+        _notifications = notifications;
     }
 
     public async Task<(ApplicationUser? User, IdentityResult Result)> RegisterStudentAsync(
@@ -69,6 +71,14 @@ public class StudentService
         enrollment.ReviewedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
+
+        var tenant = await _db.Tenants.FindAsync(tenantId);
+        if (tenant != null)
+        {
+            await _notifications.NotifyAsync(enrollment.StudentUserId, "Enrollment Approved", 
+                $"Your enrollment request for {tenant.Name} has been approved.", NotificationType.EnrollmentApproved);
+        }
+
         return enrollment;
     }
 
@@ -83,6 +93,14 @@ public class StudentService
         enrollment.RejectionReason = reason;
 
         await _db.SaveChangesAsync();
+        
+        var tenant = await _db.Tenants.FindAsync(tenantId);
+        if (tenant != null)
+        {
+            await _notifications.NotifyAsync(enrollment.StudentUserId, "Enrollment Rejected", 
+                $"Your enrollment request for {tenant.Name} has been rejected. Reason: {reason ?? "No reason provided."}", NotificationType.EnrollmentRejected);
+        }
+
         return enrollment;
     }
 
@@ -113,6 +131,14 @@ public class StudentService
         };
         _db.StudentBookAccesses.Add(access);
         await _db.SaveChangesAsync();
+        
+        var book = await _db.Books.FindAsync(bookId);
+        if (book != null)
+        {
+            await _notifications.NotifyAsync(studentUserId, "New Book Assigned", 
+                $"You have been granted access to a new book: {book.Title}", NotificationType.BookGranted, $"/student/viewer/{bookId}");
+        }
+
         return access;
     }
 
@@ -126,6 +152,14 @@ public class StudentService
 
         existing.IsActive = false;
         await _db.SaveChangesAsync();
+        
+        var book = await _db.Books.FindAsync(bookId);
+        if (book != null)
+        {
+            await _notifications.NotifyAsync(studentUserId, "Book Access Revoked", 
+                $"Your access to the book '{book.Title}' has been revoked.", NotificationType.BookRevoked);
+        }
+
         return true;
     }
 

@@ -4,6 +4,8 @@
 @inject AppDbContext Db
 @inject PrintLoggingService PrintLogging
 @inject NavigationManager Navigation
+@inject ITenantContext TenantContext
+@inject AuthenticationStateProvider AuthState
 
 <div class="content-area">
     @if (selectedBook != null)
@@ -275,6 +277,46 @@
             </div>
         </div>
     </div>
+    
+    @if (studentReadingStats != null && studentReadingStats.Any())
+    {
+        <div class="analytics-card full-width mb-4">
+            <div class="card-header">
+                <h5>Student Reading Analytics</h5>
+                <span class="count-badge">@(studentReadingStats.Count) Books Tracked</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    <table class="table table-modern">
+                        <thead>
+                            <tr>
+                                <th>Book Title</th>
+                                <th>Students Reading</th>
+                                <th>Avg. Progress</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var stat in studentReadingStats.OrderByDescending(s => s.StudentsCount))
+                            {
+                                <tr>
+                                    <td><strong>@stat.BookTitle</strong></td>
+                                    <td><span class="count-badge">@stat.StudentsCount</span></td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="progress flex-grow-1" style="height: 6px; width: 100px;">
+                                                <div class="progress-bar bg-primary" style="width: @(stat.AvgProgress)%;"></div>
+                                            </div>
+                                            <span class="small fw-semibold">@(stat.AvgProgress)%</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
 
     <div class="analytics-row">
         <div class="analytics-card">
@@ -439,6 +481,7 @@
     private List<PrintLoggingService.BookPrintStat>? printsPerBook;
     private List<PrintLog>? recentLogs;
     private List<DailyTrend>? dailyTrends;
+    private List<ReadingStat>? studentReadingStats;
 
     private Shop? selectedShop;
     private List<ShopBookAssignment>? shopBooks;
@@ -456,6 +499,13 @@
         public DateTime Date { get; set; }
         public int PrintCount { get; set; }
         public int TotalCopies { get; set; }
+    }
+    
+    private class ReadingStat
+    {
+        public string BookTitle { get; set; } = "";
+        public int StudentsCount { get; set; }
+        public int AvgProgress { get; set; }
     }
 
     protected override async Task OnInitializedAsync()
@@ -489,6 +539,26 @@
             })
             .OrderBy(x => x.Date)
             .ToListAsync();
+            
+        // Load reading stats if Teacher
+        var state = await AuthState.GetAuthenticationStateAsync();
+        if (state.User.IsInRole("Teacher") && TenantContext.TenantId > 0)
+        {
+            var progresses = await Db.StudentReadingProgresses
+                .Include(p => p.Book)
+                .Where(p => p.TenantId == TenantContext.TenantId)
+                .ToListAsync();
+                
+            studentReadingStats = progresses
+                .GroupBy(p => p.Book.Title)
+                .Select(g => new ReadingStat
+                {
+                    BookTitle = g.Key,
+                    StudentsCount = g.Count(),
+                    AvgProgress = (int)g.Average(p => p.TotalPages > 0 ? (double)p.LastPageRead / p.TotalPages * 100 : 0)
+                })
+                .ToList();
+        }
     }
 
     private async Task OpenShop(int shopId)

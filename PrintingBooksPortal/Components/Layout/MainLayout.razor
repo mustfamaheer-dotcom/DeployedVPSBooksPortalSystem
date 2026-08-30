@@ -5,6 +5,7 @@
 @inject IJSRuntime JSRuntime
 @inject AuthenticationStateProvider AuthState
 @inject ITenantContext TenantContext
+@inject PrintingBooksPortal.Services.NotificationService Notifications
 @implements IAsyncDisposable
 
 <div class="app-layout">
@@ -36,7 +37,61 @@
 
                     <AuthorizeView>
                         <Authorized>
-                            <div class="user-menu">
+                            <div class="d-flex align-items-center gap-3">
+                                @if (isStudent)
+                                {
+                                    <div class="notification-bell position-relative me-2">
+                                        <button class="btn btn-link text-dark p-0 position-relative" @onclick="ToggleNotifications" aria-label="Notifications">
+                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                                            @if (unreadCount > 0)
+                                            {
+                                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.65rem;">
+                                                    @unreadCount
+                                                    <span class="visually-hidden">unread messages</span>
+                                                </span>
+                                            }
+                                        </button>
+                                        
+                                        @if (showNotifications)
+                                        {
+                                            <div class="notification-dropdown shadow-lg rounded" style="position: absolute; right: -10px; top: 140%; width: 320px; background: white; z-index: 1050; border: 1px solid rgba(0,0,0,0.1);">
+                                                <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-light rounded-top">
+                                                    <h6 class="mb-0 fw-semibold">Notifications</h6>
+                                                </div>
+                                                <div class="list-group list-group-flush" style="max-height: 350px; overflow-y: auto;">
+                                                    @if (recentNotifications == null)
+                                                    {
+                                                        <div class="p-3 text-center text-muted">Loading...</div>
+                                                    }
+                                                    else if (!recentNotifications.Any())
+                                                    {
+                                                        <div class="p-4 text-center text-muted">
+                                                            <p class="mb-0 small">No notifications right now.</p>
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        @foreach (var n in recentNotifications)
+                                                        {
+                                                            <a href="@(string.IsNullOrEmpty(n.RelatedUrl) ? "/student/notifications" : n.RelatedUrl)" class="list-group-item list-group-item-action p-3 @(n.IsRead ? "" : "bg-light")">
+                                                                <div class="d-flex w-100 justify-content-between">
+                                                                    <h6 class="mb-1 text-truncate" style="font-size: 0.9rem;">@n.Title</h6>
+                                                                    <small class="text-muted text-nowrap ms-2" style="font-size: 0.75rem;">@n.CreatedAt.ToString("MMM d")</small>
+                                                                </div>
+                                                                <p class="mb-0 text-muted" style="font-size: 0.85rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">@n.Message</p>
+                                                            </a>
+                                                        }
+                                                    }
+                                                </div>
+                                                <div class="p-2 border-top text-center bg-light rounded-bottom">
+                                                    <a href="/student/notifications" class="text-decoration-none small fw-semibold" @onclick="() => showNotifications = false">View All</a>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            
+                                <div class="user-menu">
                                 <button class="user-menu-trigger" @onclick="ToggleUserMenu">
                                     <div class="user-avatar">
                                         @GetInitials(context.User.Identity?.Name)
@@ -60,6 +115,7 @@
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                                         Sign Out
                                     </a>
+                                </div>
                                 </div>
                             </div>
                         </Authorized>
@@ -89,6 +145,12 @@
 @code {
     private bool showSidebar = true;
     private bool showTopBar = true;
+    private bool isStudent = false;
+    private int unreadCount = 0;
+    private bool showNotifications = false;
+    private List<PrintingBooksPortal.Models.StudentNotification>? recentNotifications;
+    private System.Threading.Timer? notificationTimer;
+    
     private IJSObjectReference? layoutModule;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -111,11 +173,51 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Circuits have no HttpContext — TenantContext falls back to the ambient
-        // tenant id which is seeded here from the authenticated principal every
-        // time a page renders inside the circuit (§14.11).
         var state = await AuthState.GetAuthenticationStateAsync();
         TenantContext.Initialize(state.User);
+        
+        isStudent = state.User.IsInRole("Student");
+        if (isStudent)
+        {
+            var userId = state.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (userId != null)
+            {
+                await LoadNotifications(userId);
+                
+                // Poll every 30 seconds
+                notificationTimer = new System.Threading.Timer(async _ =>
+                {
+                    await InvokeAsync(async () =>
+                    {
+                        await LoadNotifications(userId);
+                        StateHasChanged();
+                    });
+                }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+            }
+        }
+    }
+    
+    private async Task LoadNotifications(string userId)
+    {
+        unreadCount = await Notifications.GetUnreadCountAsync(userId);
+        if (showNotifications)
+        {
+            recentNotifications = await Notifications.GetRecentAsync(userId, 5);
+        }
+    }
+    
+    private async Task ToggleNotifications()
+    {
+        showNotifications = !showNotifications;
+        if (showNotifications && isStudent)
+        {
+            var state = await AuthState.GetAuthenticationStateAsync();
+            var userId = state.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (userId != null)
+            {
+                recentNotifications = await Notifications.GetRecentAsync(userId, 5);
+            }
+        }
     }
 
     private async Task ToggleUserMenu()
@@ -162,6 +264,8 @@
 
     public async ValueTask DisposeAsync()
     {
+        notificationTimer?.Dispose();
+        
         if (layoutModule is not null)
         {
             try

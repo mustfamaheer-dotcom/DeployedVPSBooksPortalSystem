@@ -1,0 +1,106 @@
+@page "/student/notifications"
+@attribute [Authorize(Roles = "Student")]
+@rendermode InteractiveServer
+@inject PrintingBooksPortal.Services.NotificationService NotificationSvc
+@inject AuthenticationStateProvider AuthState
+@inject NavigationManager Navigation
+
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1>Notifications</h1>
+        <p class="page-subtitle">Stay updated on your enrollments and books.</p>
+    </div>
+    @if (notifications != null && notifications.Any(n => !n.IsRead))
+    {
+        <button class="btn btn-outline-primary" @onclick="MarkAllAsRead">Mark All as Read</button>
+    }
+</div>
+
+@if (notifications == null)
+{
+    <div class="text-center py-5 text-muted">Loading notifications...</div>
+}
+else if (!notifications.Any())
+{
+    <div class="content-card py-5">
+        <div class="empty-state">
+            <div class="empty-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            </div>
+            <h5 class="mb-2">No Notifications</h5>
+            <p class="text-muted">You're all caught up!</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="content-card">
+        <div class="list-group list-group-flush">
+            @foreach (var n in notifications)
+            {
+                <div class="list-group-item p-4 @(n.IsRead ? "" : "bg-light")">
+                    <div class="d-flex w-100 justify-content-between align-items-start mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            @if (!n.IsRead)
+                            {
+                                <span class="badge bg-primary rounded-circle p-1" style="width: 8px; height: 8px;"><span class="visually-hidden">Unread</span></span>
+                            }
+                            <h5 class="mb-0 fw-semibold">@n.Title</h5>
+                        </div>
+                        <small class="text-muted">@n.CreatedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</small>
+                    </div>
+                    <p class="mb-2 text-dark">@n.Message</p>
+                    @if (!string.IsNullOrEmpty(n.RelatedUrl))
+                    {
+                        <button class="btn btn-sm btn-primary mt-2" @onclick="() => NavigateToRelated(n)">View Details</button>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<PrintingBooksPortal.Models.StudentNotification>? notifications;
+    private string? userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthState.GetAuthenticationStateAsync();
+        userId = state.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        
+        if (userId != null)
+        {
+            await LoadNotifications();
+        }
+    }
+
+    private async Task LoadNotifications()
+    {
+        if (userId != null)
+        {
+            notifications = await NotificationSvc.GetRecentAsync(userId, 50);
+        }
+    }
+
+    private async Task MarkAllAsRead()
+    {
+        if (userId != null)
+        {
+            await NotificationSvc.MarkAllReadAsync(userId);
+            await LoadNotifications();
+        }
+    }
+    
+    private async Task NavigateToRelated(PrintingBooksPortal.Models.StudentNotification n)
+    {
+        if (!n.IsRead)
+        {
+            await NotificationSvc.MarkReadAsync(n.Id);
+        }
+        if (!string.IsNullOrEmpty(n.RelatedUrl))
+        {
+            Navigation.NavigateTo(n.RelatedUrl);
+        }
+    }
+}

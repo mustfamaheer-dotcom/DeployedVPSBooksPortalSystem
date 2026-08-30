@@ -5,6 +5,7 @@
 @inject AppDbContext Db
 @inject ITenantContext TenantContext
 @inject UserManager<ApplicationUser> UserManager
+@inject PrintingBooksPortal.Services.AuditService AuditService
 @inject NavigationManager Navigation
 
 <div class="content-area">
@@ -234,6 +235,14 @@
     private async Task ApproveEnrollment(int id)
     {
         await StudentSvc.ApproveEnrollmentAsync(id, TenantContext.TenantId);
+        
+        var state = await AuthState!;
+        var userId = state.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (userId != null)
+        {
+            await AuditService.LogAsync(TenantContext.TenantId, userId, "ApproveEnrollment", "StudentEnrollment", id.ToString(), $"Approved enrollment {id}");
+        }
+        
         message = "Student enrollment approved.";
         await LoadData();
     }

@@ -95,6 +95,8 @@ builder.Services.AddScoped<SystemAdminService>();
 builder.Services.AddScoped<PrinterRegistrationService>();
 builder.Services.AddScoped<RegistrationService>();
 builder.Services.AddScoped<StudentService>();
+builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<AuditService>();
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddRazorComponents()

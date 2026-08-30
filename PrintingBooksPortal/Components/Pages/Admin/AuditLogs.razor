@@ -1,0 +1,75 @@
+@page "/admin/audit"
+@attribute [Authorize(Policy = "TenantAdmin")]
+@rendermode InteractiveServer
+@inject PrintingBooksPortal.Services.AuditService AuditService
+@inject PrintingBooksPortal.Data.AppDbContext Db
+@inject ITenantContext TenantContext
+
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1>Audit Logs</h1>
+        <p class="page-subtitle">Track important actions taken in your portal.</p>
+    </div>
+</div>
+
+<div class="content-card">
+    @if (logs == null)
+    {
+        <div class="p-5 text-center text-muted">Loading logs...</div>
+    }
+    else if (!logs.Any())
+    {
+        <div class="empty-state py-5">
+            <div class="empty-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            </div>
+            <h5 class="mb-2">No Logs Yet</h5>
+            <p class="text-muted">No auditable actions have been performed yet.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Action</th>
+                        <th>User ID</th>
+                        <th>Entity</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var log in logs)
+                    {
+                        <tr>
+                            <td class="text-nowrap">@log.OccurredAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</td>
+                            <td><span class="badge bg-secondary bg-opacity-10 text-secondary">@log.Action</span></td>
+                            <td><code class="small">@log.ActorUserId</code></td>
+                            <td>@log.EntityType <span class="text-muted">(ID: @log.EntityId)</span></td>
+                            <td class="text-muted small">@log.Details</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<PrintingBooksPortal.Models.AuditLog>? logs;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Fetch only logs for this tenant if they are a Teacher.
+        // The AuditService currently fetches all but we'll fetch manually here for the UI to be safe.
+        // Wait, AuditService.GetRecentLogsAsync could be modified, but we can also just query Db here directly since we injected it.
+        
+        logs = await Db.AuditLogs
+            .Where(a => a.TenantId == TenantContext.TenantId)
+            .OrderByDescending(a => a.OccurredAt)
+            .Take(100)
+            .ToListAsync();
+    }
+}

@@ -21,8 +21,14 @@ window.studentAnnotations = {
     touchStartX: 0,
     touchEndX: 0,
     
-    init: function(pdfUrl, storageKey) {
+    dotNetRef: null,
+    
+    init: function(pdfUrl, storageKey, lastPageRead, dotNetRef, serverAnnotationsJson) {
         this.storageKey = storageKey;
+        this.dotNetRef = dotNetRef;
+        if (lastPageRead && lastPageRead > 0) {
+            this.pageNum = lastPageRead;
+        }
         
         // Responsive scale based on screen width
         if (window.innerWidth <= 480) {
@@ -40,7 +46,7 @@ window.studentAnnotations = {
         this.annotCanvas = document.getElementById('annotation-canvas');
         this.annotCtx = this.annotCanvas.getContext('2d');
         
-        this.loadAnnotations();
+        this.loadAnnotations(serverAnnotationsJson);
         this.setupEventListeners();
         
         // Asynchronous download of PDF with credentials (to send cookies for [Authorize] endpoint)
@@ -121,12 +127,18 @@ window.studentAnnotations = {
         if (this.pageNum <= 1) return;
         this.pageNum--;
         this.queueRenderPage(this.pageNum);
+        if (this.dotNetRef) {
+            this.dotNetRef.invokeMethodAsync('OnPageChanged', this.pageNum);
+        }
     },
     
     nextPage: function() {
         if (this.pageNum >= this.pdfDoc.numPages) return;
         this.pageNum++;
         this.queueRenderPage(this.pageNum);
+        if (this.dotNetRef) {
+            this.dotNetRef.invokeMethodAsync('OnPageChanged', this.pageNum);
+        }
     },
     
     zoomIn: function() {
@@ -407,27 +419,55 @@ window.studentAnnotations = {
         }
     },
     
-    loadAnnotations: function() {
-        if (!this.storageKey) return;
-        var saved = localStorage.getItem(this.storageKey);
-        if (saved) {
+    loadAnnotations: function(serverAnnotationsJson) {
+        // Start with empty
+        this.annotations = {};
+        
+        // Load from local storage
+        if (this.storageKey) {
+            var saved = localStorage.getItem(this.storageKey);
+            if (saved) {
+                try {
+                    this.annotations = JSON.parse(saved);
+                } catch (e) {
+                    console.error("Could not parse local annotations", e);
+                }
+            }
+        }
+        
+        // Merge with server annotations (server wins on conflict if we want, but simple replace for now since we sync JSON string)
+        if (serverAnnotationsJson) {
             try {
-                this.annotations = JSON.parse(saved);
+                var serverData = JSON.parse(serverAnnotationsJson);
+                if (serverData && Object.keys(serverData).length > 0) {
+                    this.annotations = serverData;
+                    // also update local storage to match server
+                    if (this.storageKey) {
+                        localStorage.setItem(this.storageKey, serverAnnotationsJson);
+                    }
+                }
             } catch (e) {
-                console.error("Could not parse annotations", e);
-                this.annotations = {};
+                console.error("Could not parse server annotations", e);
             }
         }
     },
     
     saveAnnotations: function(showSuccess = true) {
-        if (!this.storageKey) return;
-        localStorage.setItem(this.storageKey, JSON.stringify(this.annotations));
+        var jsonData = JSON.stringify(this.annotations);
+        if (this.storageKey) {
+            localStorage.setItem(this.storageKey, jsonData);
+        }
+        
+        if (this.dotNetRef) {
+            this.dotNetRef.invokeMethodAsync('SyncAnnotations', jsonData).catch(err => {
+                console.error("Error syncing annotations to server: ", err);
+            });
+        }
         
         // If called manually via the Save button, show feedback
         if (showSuccess === true) {
             if (window.showToast) {
-                window.showToast("Annotations saved to your device", "success");
+                window.showToast("Annotations saved successfully", "success");
             } else {
                 alert("Annotations saved successfully!");
             }

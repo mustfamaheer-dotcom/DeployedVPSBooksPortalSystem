@@ -25,6 +25,61 @@
             </ul>
         </div>
     }
+    
+    @if (activeAnnouncements != null && activeAnnouncements.Any())
+    {
+        <div class="alert alert-info mb-4 border-0 shadow-sm" style="background-color: var(--blue-50);">
+            <div class="d-flex align-items-center mb-3">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" class="me-2"><path d="M3 11l18-5v12L3 14v-3z"></path><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"></path></svg>
+                <h6 class="alert-heading fw-semibold mb-0" style="color: var(--blue-700);">Teacher Announcements</h6>
+            </div>
+            <div class="d-flex flex-column gap-3">
+                @foreach (var a in activeAnnouncements)
+                {
+                    <div class="bg-white p-3 rounded shadow-sm">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="mb-0 fw-bold">@a.Title</h6>
+                            <span class="badge bg-light text-dark border">@a.Tenant.Name</span>
+                        </div>
+                        <p class="mb-1 text-dark" style="white-space: pre-wrap;">@a.Body</p>
+                        <small class="text-muted">@a.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")</small>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    
+    @if (recentProgresses != null && recentProgresses.Any())
+    {
+        <div class="content-card mb-4">
+            <div class="card-header border-bottom-0 pb-2">
+                <h5 class="mb-0">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-2 text-primary" style="vertical-align:-4px"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                    Continue Reading
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    @foreach (var p in recentProgresses)
+                    {
+                        var percent = p.TotalPages > 0 ? (int)Math.Clamp((double)p.LastPageRead / p.TotalPages * 100, 0, 100) : 0;
+                        <button type="button" class="list-group-item list-group-item-action p-3" @onclick="() => OpenViewer(p.BookId)">
+                            <div class="d-flex w-100 justify-content-between mb-1">
+                                <h6 class="mb-0 fw-semibold text-truncate">@p.Book.Title</h6>
+                                <small class="text-muted text-nowrap ms-2">p.@p.LastPageRead / @(p.TotalPages > 0 ? p.TotalPages : p.LastPageRead)</small>
+                            </div>
+                            <div class="d-flex w-100 align-items-center mt-2">
+                                <div class="progress flex-grow-1 me-3" style="height: 4px;">
+                                    <div class="progress-bar bg-primary" style="width: @(percent)%;"></div>
+                                </div>
+                                <span class="badge bg-light text-dark border flex-shrink-0">@p.Tenant.Name</span>
+                            </div>
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    }
 
     <div class="content-card mb-4">
         <div class="card-header">
@@ -70,6 +125,8 @@
     private string userName = "";
     private List<StudentEnrollment>? pendingEnrollments;
     private List<Tenant>? approvedTeachers;
+    private List<StudentReadingProgress>? recentProgresses;
+    private List<TeacherAnnouncement>? activeAnnouncements;
 
     [CascadingParameter]
     private Task<AuthenticationState>? AuthState { get; set; }
@@ -96,6 +153,27 @@
 
         pendingEnrollments = allEnrollments.Where(e => e.Status == EnrollmentStatus.Pending).ToList();
         approvedTeachers = allEnrollments.Where(e => e.Status == EnrollmentStatus.Approved).Select(e => e.Tenant).ToList();
+        
+        recentProgresses = await db.StudentReadingProgresses
+            .Include(p => p.Book)
+            .Include(p => p.Tenant)
+            .Where(p => p.StudentUserId == user.Id)
+            .OrderByDescending(p => p.LastReadAt)
+            .Take(3)
+            .ToListAsync();
+            
+        var teacherIds = approvedTeachers.Select(t => t.Id).ToList();
+        activeAnnouncements = await db.TeacherAnnouncements
+            .Include(a => a.Tenant)
+            .Where(a => teacherIds.Contains(a.TenantId) && a.IsActive)
+            .OrderByDescending(a => a.CreatedAt)
+            .Take(5)
+            .ToListAsync();
+    }
+
+    private void OpenViewer(int bookId)
+    {
+        Navigation.NavigateTo($"/student/viewer/{bookId}");
     }
 
     private void OpenTeacher(int tenantId)
