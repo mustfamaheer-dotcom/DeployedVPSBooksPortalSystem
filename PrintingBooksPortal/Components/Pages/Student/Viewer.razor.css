@@ -1,0 +1,98 @@
+.viewer-header-dark {
+    background-color: #1e2235;
+    border-bottom: 1px solid #2d334a;
+}
+
+.tool-group {
+    display: flex;
+    align-items: center;
+    background-color: #2d334a;
+    border-radius: 8px;
+    padding: 2px;
+}
+
+.tool-divider {
+    width: 1px;
+    height: 20px;
+    background-color: #4a5568;
+    margin: 0 4px;
+}
+
+.tool-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.tool-btn.icon-only {
+    padding: 6px;
+    min-width: 32px;
+}
+
+.tool-btn:hover, .tool-btn.active {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #f8fafc;
+}
+
+.tool-btn.outline {
+    background-color: #2d334a;
+    border: 1px solid #4a5568;
+    color: #cbd5e1;
+}
+
+.tool-btn.outline:hover, .tool-btn.outline.active {
+    background-color: #3b425f;
+    border-color: #64748b;
+    color: #ffffff;
+}
+
+.btn-danger-soft {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.btn-danger-soft:hover {
+    background-color: #ef4444;
+    color: white;
+}
+
+.color-dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+}
+
+.btn-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+}
+
+@media (max-width: 768px) {
+    .viewer-header-dark {
+        padding-top: 12px;
+        padding-bottom: 12px;
+        justify-content: center;
+    }
+    
+    .annotation-toolbar {
+        justify-content: center;
+        width: 100%;
+        margin-top: 10px;
+    }
+}

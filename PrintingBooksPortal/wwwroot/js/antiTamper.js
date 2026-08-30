@@ -98,6 +98,11 @@
         var blocked = false;
         var check = function () {
             if (window.allowDevTools) return;
+            // Ignore resize heuristics on mobile because scrolling hides the URL bar, 
+            // drastically changing innerHeight and falsely triggering the DevTools block.
+            var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            if (isMobile) return;
+            
             var w = window.outerWidth - window.innerWidth > threshold ||
                     window.outerHeight - window.innerHeight > threshold;
             if (w && !blocked) {

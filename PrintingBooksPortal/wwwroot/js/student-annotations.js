@@ -31,7 +31,12 @@ window.studentAnnotations = {
         // Asynchronous download of PDF with credentials (to send cookies for [Authorize] endpoint)
         pdfjsLib.getDocument({ url: pdfUrl, withCredentials: true }).promise.then(function(pdfDoc_) {
             window.studentAnnotations.pdfDoc = pdfDoc_;
-            document.getElementById('page-count').textContent = window.studentAnnotations.pdfDoc.numPages;
+            
+            var countTop = document.getElementById('page-count-top');
+            if (countTop) countTop.textContent = window.studentAnnotations.pdfDoc.numPages;
+            
+            var countBottom = document.getElementById('page-count');
+            if (countBottom) countBottom.textContent = window.studentAnnotations.pdfDoc.numPages;
             
             // Initial/first page rendering
             window.studentAnnotations.renderPage(window.studentAnnotations.pageNum);
@@ -68,6 +73,10 @@ window.studentAnnotations = {
             renderTask.promise.then(function() {
                 window.studentAnnotations.pageRendering = false;
                 
+                // Hide loading spinner if it exists
+                var spinner = document.getElementById('pdf-loading-spinner');
+                if (spinner) spinner.style.display = 'none';
+                
                 // Draw annotations for this page
                 window.studentAnnotations.redrawAnnotations();
                 
@@ -78,7 +87,11 @@ window.studentAnnotations = {
             });
         });
         
-        document.getElementById('page-num').textContent = num;
+        var pNumTop = document.getElementById('page-num-top');
+        if (pNumTop) pNumTop.textContent = num;
+        
+        var pNumBottom = document.getElementById('page-num');
+        if (pNumBottom) pNumBottom.textContent = num;
     },
     
     queueRenderPage: function(num) {
@@ -112,6 +125,14 @@ window.studentAnnotations = {
         } else {
             this.annotCanvas.style.cursor = 'default';
         }
+        
+        // Update active class on toolbar buttons
+        document.querySelectorAll('.tool-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes("'" + tool + "'")) {
+                btn.classList.add('active');
+            }
+        });
     },
     
     getPointerPos: function(e) {
@@ -141,7 +162,7 @@ window.studentAnnotations = {
                         color: '#ef4444' // red notes
                     });
                     self.redrawAnnotations();
-                    self.saveAnnotations();
+                    self.saveAnnotations(false); // background save
                 }
                 return;
             }
@@ -194,7 +215,7 @@ window.studentAnnotations = {
             
             if (self.currentPath && self.currentPath.points.length > 1) {
                 self.addAnnotation(self.currentPath);
-                self.saveAnnotations();
+                self.saveAnnotations(false); // background save
             }
             self.currentPath = null;
         });
@@ -248,7 +269,7 @@ window.studentAnnotations = {
         
         if (erased) {
             this.redrawAnnotations();
-            this.saveAnnotations();
+            this.saveAnnotations(false); // background save
         }
     },
     
@@ -293,15 +314,24 @@ window.studentAnnotations = {
         }
     },
     
-    saveAnnotations: function() {
+    saveAnnotations: function(showSuccess = true) {
         if (!this.storageKey) return;
         localStorage.setItem(this.storageKey, JSON.stringify(this.annotations));
+        
+        // If called manually via the Save button, show feedback
+        if (showSuccess === true) {
+            if (window.showToast) {
+                window.showToast("Annotations saved to your device", "success");
+            } else {
+                alert("Annotations saved successfully!");
+            }
+        }
     },
     
     clearAll: function() {
         if (confirm("Are you sure you want to clear all annotations from all pages of this book? This cannot be undone.")) {
             this.annotations = {};
-            this.saveAnnotations();
+            this.saveAnnotations(false);
             this.redrawAnnotations();
         }
     }

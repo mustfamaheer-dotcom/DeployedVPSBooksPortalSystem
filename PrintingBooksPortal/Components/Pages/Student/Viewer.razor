@@ -7,54 +7,64 @@
 @inject IJSRuntime JS
 
 <div class="student-viewer-layout">
-    <div class="viewer-header d-flex flex-wrap justify-content-between align-items-center px-3 px-md-4 py-3 bg-white border-bottom shadow-sm gap-3">
-        <div class="d-flex align-items-center">
-            <button class="btn btn-light btn-sm me-3" @onclick="GoBack">
+    <div class="viewer-header-dark d-flex flex-wrap justify-content-between align-items-center px-3 px-md-4 py-2 gap-3 shadow-sm">
+        <div class="d-flex align-items-center gap-3">
+            <button class="btn btn-light btn-sm btn-icon rounded-3" @onclick="GoBack" title="Back">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
-            <h5 class="mb-0 fw-semibold text-truncate" style="max-width: 300px;">@bookTitle</h5>
-        </div>
-        
-        <div class="annotation-toolbar d-flex flex-wrap gap-2">
-            <div class="btn-group shadow-sm">
-                <button class="btn btn-outline-secondary" title="Highlight (Yellow)" onclick="studentAnnotations.setTool('highlight-yellow')">
-                    <span style="color: #fbbf24;">●</span> Highlight
+            <h5 class="mb-0 fw-semibold text-truncate text-light" style="max-width: 250px;">@bookTitle</h5>
+            
+            <!-- Pagination inside toolbar -->
+            <div class="d-none d-md-flex align-items-center gap-2 ms-4 bg-dark-subtle px-3 py-1 rounded-pill">
+                <button class="btn btn-link btn-sm text-light p-0 text-decoration-none" onclick="studentAnnotations.prevPage()" title="Previous Page">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
                 </button>
-                <button class="btn btn-outline-secondary" title="Highlight (Green)" onclick="studentAnnotations.setTool('highlight-green')">
-                    <span style="color: #34d399;">●</span>
-                </button>
-                <button class="btn btn-outline-secondary" title="Highlight (Pink)" onclick="studentAnnotations.setTool('highlight-pink')">
-                    <span style="color: #f472b6;">●</span>
+                <span class="text-light small fw-medium">Page <span id="page-num-top">1</span> / <span id="page-count-top">--</span></span>
+                <button class="btn btn-link btn-sm text-light p-0 text-decoration-none" onclick="studentAnnotations.nextPage()" title="Next Page">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
             </div>
-            <button class="btn btn-outline-secondary shadow-sm" title="Pen Tool" onclick="studentAnnotations.setTool('pen')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+        </div>
+        
+        <div class="annotation-toolbar d-flex flex-wrap align-items-center gap-2">
+            <div class="tool-group">
+                <button class="tool-btn" title="Highlight (Yellow)" onclick="studentAnnotations.setTool('highlight-yellow')">
+                    <span class="color-dot" style="background-color: #fbbf24;"></span> <span class="d-none d-lg-inline ms-1">Highlight</span>
+                </button>
+                <div class="tool-divider"></div>
+                <button class="tool-btn icon-only" title="Highlight (Green)" onclick="studentAnnotations.setTool('highlight-green')">
+                    <span class="color-dot" style="background-color: #34d399;"></span>
+                </button>
+                <div class="tool-divider"></div>
+                <button class="tool-btn icon-only" title="Highlight (Pink)" onclick="studentAnnotations.setTool('highlight-pink')">
+                    <span class="color-dot" style="background-color: #f472b6;"></span>
+                </button>
+            </div>
+
+            <button class="tool-btn outline" title="Pen Tool" onclick="studentAnnotations.setTool('pen')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
                 Pen
             </button>
-            <button class="btn btn-outline-secondary shadow-sm" title="Text Note" onclick="studentAnnotations.setTool('text')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+            
+            <button class="tool-btn outline" title="Text Note" onclick="studentAnnotations.setTool('text')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
                 Text
             </button>
-            <button class="btn btn-outline-secondary shadow-sm" title="Eraser" onclick="studentAnnotations.setTool('eraser')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+            
+            <button class="tool-btn outline" title="Eraser" onclick="studentAnnotations.setTool('eraser')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                 Erase
             </button>
             
-            <div class="vr mx-2"></div>
-            
-            <button class="btn btn-danger shadow-sm" onclick="studentAnnotations.clearAll()">
+            <button class="tool-btn btn-danger-soft ms-md-2" onclick="studentAnnotations.clearAll()">
                 Clear All
             </button>
+
+            <button class="btn btn-primary btn-sm px-3 ms-1 fw-medium shadow-sm d-flex align-items-center gap-1" onclick="studentAnnotations.saveAnnotations()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Save
+            </button>
         </div>
-        
-        <div class="d-flex align-items-center text-muted small">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12A9 9 0 0 1 6 18.7L3 16"/></svg>
-            Saved Locally
-        </div>
-    </div>
-    
-    <div class="alert alert-info text-center rounded-0 mb-0 border-0 py-2 shadow-sm" style="font-size: 0.9rem;">
-        <strong>Note:</strong> Annotations are saved privately in this browser. They are not uploaded to the server and will not appear if you use a different device.
     </div>
 
     <div class="viewer-container bg-light" style="height: calc(100vh - 120px); overflow: auto; position: relative;">
@@ -62,9 +72,13 @@
         {
             <!-- PDF Viewer iframe or canvas -->
             <div id="pdf-container" style="position: relative; margin: 0 auto; width: fit-content; max-width: 100%; padding: 10px; overflow-x: auto;">
+                <div id="pdf-loading-spinner" class="position-absolute top-50 start-50 translate-middle text-center" style="z-index: 20;">
+                    <div class="spinner-border text-primary mb-2" role="status"></div>
+                    <div class="fw-medium text-muted">Loading Document...</div>
+                </div>
                 <canvas id="pdf-canvas" class="shadow"></canvas>
                 <!-- Annotation layer overlaid on top of the PDF canvas -->
-                <canvas id="annotation-canvas" style="position: absolute; top: 20px; left: 20px; cursor: crosshair; z-index: 10;"></canvas>
+                <canvas id="annotation-canvas" style="position: absolute; top: 10px; left: 10px; cursor: crosshair; z-index: 10;"></canvas>
             </div>
             
             <div class="viewer-controls position-fixed bottom-0 start-50 translate-middle-x mb-4 bg-white rounded-pill shadow px-4 py-2 d-flex align-items-center gap-3">
