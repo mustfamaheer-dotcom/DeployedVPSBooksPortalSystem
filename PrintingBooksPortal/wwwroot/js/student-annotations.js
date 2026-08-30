@@ -17,8 +17,23 @@ window.studentAnnotations = {
     
     currentPath: null,
     
+    // Add touch tracking variables
+    touchStartX: 0,
+    touchEndX: 0,
+    
     init: function(pdfUrl, storageKey) {
         this.storageKey = storageKey;
+        
+        // Responsive scale based on screen width
+        if (window.innerWidth <= 480) {
+            this.scale = 0.8;
+        } else if (window.innerWidth <= 768) {
+            this.scale = 1.0;
+        } else if (window.innerWidth <= 992) {
+            this.scale = 1.2;
+        } else {
+            this.scale = 1.5;
+        }
         this.canvas = document.getElementById('pdf-canvas');
         this.ctx = this.canvas.getContext('2d');
         
@@ -114,6 +129,18 @@ window.studentAnnotations = {
         this.queueRenderPage(this.pageNum);
     },
     
+    zoomIn: function() {
+        if (this.scale >= 3.0) return;
+        this.scale += 0.2;
+        this.queueRenderPage(this.pageNum);
+    },
+    
+    zoomOut: function() {
+        if (this.scale <= 0.5) return;
+        this.scale -= 0.2;
+        this.queueRenderPage(this.pageNum);
+    },
+    
     setTool: function(tool) {
         this.currentTool = tool;
         if (tool === 'text') {
@@ -146,6 +173,51 @@ window.studentAnnotations = {
     setupEventListeners: function() {
         var self = this;
         
+        // Touch events for drawing & swiping
+        this.annotCanvas.addEventListener('touchstart', function(e) {
+            if (e.touches.length === 1) {
+                self.touchStartX = e.touches[0].clientX;
+            }
+            if (self.currentTool) {
+                e.preventDefault(); // Prevent scrolling while drawing
+                var touch = e.touches[0];
+                var mouseEvent = new MouseEvent("mousedown", {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                });
+                self.annotCanvas.dispatchEvent(mouseEvent);
+            }
+        }, { passive: false });
+        
+        this.annotCanvas.addEventListener('touchmove', function(e) {
+            if (self.currentTool && self.isDrawing) {
+                e.preventDefault();
+                var touch = e.touches[0];
+                var mouseEvent = new MouseEvent("mousemove", {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                });
+                self.annotCanvas.dispatchEvent(mouseEvent);
+            }
+        }, { passive: false });
+        
+        this.annotCanvas.addEventListener('touchend', function(e) {
+            if (self.currentTool && self.isDrawing) {
+                e.preventDefault();
+                var mouseEvent = new MouseEvent("mouseup", {});
+                self.annotCanvas.dispatchEvent(mouseEvent);
+            } else if (!self.currentTool && e.changedTouches.length === 1) {
+                // Handle swipe
+                self.touchEndX = e.changedTouches[0].clientX;
+                var swipeDist = self.touchStartX - self.touchEndX;
+                if (swipeDist > 50) {
+                    self.nextPage(); // Swipe left -> next
+                } else if (swipeDist < -50) {
+                    self.prevPage(); // Swipe right -> prev
+                }
+            }
+        });
+
         this.annotCanvas.addEventListener('mousedown', function(e) {
             if (!self.currentTool) return;
             

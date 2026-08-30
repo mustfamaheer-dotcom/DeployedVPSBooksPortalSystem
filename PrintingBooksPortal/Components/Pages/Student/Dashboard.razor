@@ -5,10 +5,9 @@
 @inject NavigationManager Navigation
 @inject IServiceScopeFactory ScopeFactory
 
-<div class="content-area">
-    <div class="page-header">
-        <div>
-            <h1>Student Dashboard</h1>
+<div class="page-header">
+    <div>
+        <h1>Student Dashboard</h1>
             <p class="page-subtitle">Welcome back, @userName</p>
         </div>
     </div>
@@ -50,25 +49,23 @@
                 <div class="list-group list-group-flush">
                     @foreach (var t in approvedTeachers)
                     {
-                        <button type="button" class="list-group-item list-group-item-action p-4 d-flex align-items-center justify-content-between" @onclick="() => OpenTeacher(t.Id)">
-                            <div class="d-flex align-items-center gap-3">
-                                <div class="avatar-initials avatar-md" style="background: hsl(@HFor(t.Name) 62% 46%);">
+                        <button type="button" class="list-group-item list-group-item-action p-4 d-flex align-items-center justify-content-between" @onclick="() => OpenTeacher(t.Id)" aria-label="View books for @t.Name">
+                            <div class="d-flex align-items-center gap-3 w-100">
+                                <div class="avatar-initials avatar-md flex-shrink-0" style="background: hsl(@HFor(t.Name) 62% 46%);">
                                     @Initials(t.Name)
                                 </div>
-                                <div>
-                                    <h5 class="mb-1 fw-semibold text-dark">@t.Name</h5>
-                                    <div class="text-muted small">View your assigned books for this teacher</div>
+                                <div class="text-start overflow-hidden">
+                                    <h5 class="mb-1 fw-semibold text-dark text-truncate">@t.Name</h5>
+                                    <div class="text-muted small text-truncate">View your assigned books for this teacher</div>
                                 </div>
                             </div>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted"><polyline points="9 18 15 12 9 6"/></svg>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted flex-shrink-0 ms-2"><polyline points="9 18 15 12 9 6"/></svg>
                         </button>
                     }
                 </div>
             }
         </div>
     </div>
-</div>
-
 @code {
     private string userName = "";
     private List<StudentEnrollment>? pendingEnrollments;

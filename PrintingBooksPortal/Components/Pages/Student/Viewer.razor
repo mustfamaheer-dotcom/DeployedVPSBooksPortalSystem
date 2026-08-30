@@ -8,8 +8,8 @@
 
 <div class="student-viewer-layout">
     <div class="viewer-header-dark d-flex flex-wrap justify-content-between align-items-center px-3 px-md-4 py-2 gap-3 shadow-sm">
-        <div class="d-flex align-items-center gap-3">
-            <button class="btn btn-light btn-sm btn-icon rounded-3" @onclick="GoBack" title="Back">
+        <div class="d-flex align-items-center gap-3" style="min-width: 0; flex: 1;">
+            <button class="btn btn-light btn-sm btn-icon rounded-3 flex-shrink-0" @onclick="GoBack" title="Back">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
             <h5 class="mb-0 fw-semibold text-truncate text-light" style="max-width: 250px;">@bookTitle</h5>
@@ -67,11 +67,11 @@
         </div>
     </div>
 
-    <div class="viewer-container bg-light" style="height: calc(100vh - 120px); overflow: auto; position: relative;">
+    <div class="viewer-container bg-light">
         @if (hasAccess)
         {
             <!-- PDF Viewer iframe or canvas -->
-            <div id="pdf-container" style="position: relative; margin: 0 auto; width: fit-content; max-width: 100%; padding: 10px; overflow-x: auto;">
+            <div id="pdf-container" style="position: relative; margin: 0 auto; width: 100%; max-width: 100%; padding: 10px; overflow-x: auto;">
                 <div id="pdf-loading-spinner" class="position-absolute top-50 start-50 translate-middle text-center" style="z-index: 20;">
                     <div class="spinner-border text-primary mb-2" role="status"></div>
                     <div class="fw-medium text-muted">Loading Document...</div>
@@ -81,12 +81,19 @@
                 <canvas id="annotation-canvas" style="position: absolute; top: 10px; left: 10px; cursor: crosshair; z-index: 10;"></canvas>
             </div>
             
-            <div class="viewer-controls position-fixed bottom-0 start-50 translate-middle-x mb-4 bg-white rounded-pill shadow px-4 py-2 d-flex align-items-center gap-3">
-                <button class="btn btn-sm btn-light rounded-circle" onclick="studentAnnotations.prevPage()">
+            <div class="viewer-controls position-fixed bottom-0 start-50 translate-middle-x mb-4 bg-white rounded-pill shadow px-3 py-2 d-flex align-items-center gap-2 gap-md-3">
+                <button class="btn btn-sm btn-light rounded-circle flex-shrink-0" onclick="studentAnnotations.zoomOut()" title="Zoom Out">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                </button>
+                <button class="btn btn-sm btn-light rounded-circle flex-shrink-0" onclick="studentAnnotations.zoomIn()" title="Zoom In">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                </button>
+                <div class="border-start ms-1 me-1 h-100" style="min-height: 24px;"></div>
+                <button class="btn btn-sm btn-light rounded-circle flex-shrink-0" onclick="studentAnnotations.prevPage()">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
                 </button>
-                <span class="fw-semibold">Page <span id="page-num">1</span> / <span id="page-count">--</span></span>
-                <button class="btn btn-sm btn-light rounded-circle" onclick="studentAnnotations.nextPage()">
+                <span class="fw-semibold text-nowrap" style="font-size: 0.9rem;">Page <span id="page-num">1</span> / <span id="page-count">--</span></span>
+                <button class="btn btn-sm btn-light rounded-circle flex-shrink-0" onclick="studentAnnotations.nextPage()">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
             </div>

@@ -1,6 +1,22 @@
+.student-viewer-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    background-color: #2a2d3a;
+}
+
 .viewer-header-dark {
     background-color: #1e2235;
     border-bottom: 1px solid #2d334a;
+    flex-shrink: 0;
+}
+
+.viewer-container {
+    flex: 1;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
 }
 
 .tool-group {
@@ -87,12 +103,48 @@
     .viewer-header-dark {
         padding-top: 12px;
         padding-bottom: 12px;
-        justify-content: center;
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 12px !important;
     }
     
     .annotation-toolbar {
-        justify-content: center;
+        display: flex;
+        overflow-x: auto;
+        flex-wrap: nowrap !important;
+        gap: 6px !important;
+        padding-bottom: 4px;
+        scrollbar-width: none; /* Firefox */
         width: 100%;
-        margin-top: 10px;
+        justify-content: flex-start !important;
+    }
+    
+    .annotation-toolbar::-webkit-scrollbar {
+        display: none; /* Chrome/Safari */
+    }
+    
+    .viewer-controls {
+        margin-bottom: calc(1rem + env(safe-area-inset-bottom)) !important;
+    }
+    
+    .viewer-controls .btn {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
+
+@media (max-width: 480px) {
+    .viewer-header-dark h5 {
+        max-width: none !important;
+        flex: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
     }
 }

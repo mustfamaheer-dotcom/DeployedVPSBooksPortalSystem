@@ -45,7 +45,15 @@
     animation: fadeIn 0.25s ease;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1199px) and (min-width: 992px) {
+    .app-sidebar { width: var(--sidebar-width-tablet); min-width: var(--sidebar-width-tablet); }
+    .app-main { margin-left: var(--sidebar-width-tablet); }
+}
+
+@media (max-width: 767px) {
+    .app-header {
+        height: var(--header-height-mobile);
+    }
     .app-content {
         padding: 0.75rem;
     }
@@ -61,6 +69,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    min-height: 44px;
+    min-width: 44px;
 }
 
 .sidebar-toggle:hover {

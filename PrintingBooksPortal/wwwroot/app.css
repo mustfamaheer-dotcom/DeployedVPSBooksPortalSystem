@@ -19,7 +19,9 @@
     --gray-800: #1e293b;
     --gray-900: #0f172a;
     --sidebar-width: 260px;
+    --sidebar-width-tablet: 220px;
     --header-height: 64px;
+    --header-height-mobile: 56px;
     --radius: 12px;
     --radius-sm: 8px;
     --radius-xl: 16px;
@@ -870,7 +872,7 @@ a:hover { color: var(--primary-dark); }
 .page-header-actions { display: flex; gap: 0.5rem; align-items: center; }
 
 /* ===== Content Area ===== */
-.content-area { padding: 1.5rem; max-width: 1400px; margin: 0 auto; }
+.content-area { padding: clamp(0.75rem, 3vw, 1.5rem); max-width: 1400px; margin: 0 auto; }
 
 .content-card {
     background: #fff;
@@ -3753,9 +3755,26 @@ textarea.watermark-textarea {
 .body-frozen { overflow: hidden; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   MOBILE RESPONSIVENESS TWEAKS
+   RESPONSIVENESS (TABLETS & MOBILE)
    ═══════════════════════════════════════════════════════════════════════════ */
-@media (max-width: 768px) {
+
+/* Large Tablets / iPad Landscape (992px - 1199px) */
+@media (max-width: 1199px) and (min-width: 992px) {
+    .page-header h1 { font-size: 1.35rem; }
+    .content-area { padding: 1.25rem; }
+}
+
+/* Tablets / iPad Portrait (768px - 991px) */
+@media (max-width: 991px) {
+    .page-header h1 { font-size: 1.25rem; }
+    
+    .detail-grid, .analytics-grid, .analytics-row {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+/* Mobile Phones (up to 767px) */
+@media (max-width: 767px) {
     /* Make tables responsive */
     .table-modern {
         display: block;
@@ -3805,4 +3824,14 @@ textarea.watermark-textarea {
     .modal-body {
         padding: 1rem;
     }
+    
+    /* Utilities for mobile padding */
+    .p-4 { padding: 1rem !important; }
+}
+
+/* Very Small Phones (up to 480px) */
+@media (max-width: 480px) {
+    .page-header { flex-direction: column; align-items: flex-start; }
+    .page-header-actions { width: 100%; }
+    .page-header-actions .btn { width: 100%; justify-content: center; }
 }
