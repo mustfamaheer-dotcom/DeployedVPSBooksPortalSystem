@@ -12,7 +12,7 @@ using PrintingBooksPortal.Data;
 namespace PrintingBooksPortal.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260830141134_AddStudentAndRegistrationModule")]
+    [Migration("20260830144623_AddStudentAndRegistrationModule")]
     partial class AddStudentAndRegistrationModule
     {
         /// <inheritdoc />
@@ -524,8 +524,8 @@ namespace PrintingBooksPortal.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("ReviewedByUserId")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
@@ -643,16 +643,16 @@ namespace PrintingBooksPortal.Migrations
 
                     b.Property<string>("GrantedByUserId")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
                     b.Property<string>("StudentUserId")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<int>("TenantId")
                         .HasColumnType("int");
@@ -698,8 +698,8 @@ namespace PrintingBooksPortal.Migrations
 
                     b.Property<string>("StudentUserId")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<int>("TenantId")
                         .HasColumnType("int");

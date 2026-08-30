@@ -13,7 +13,7 @@ public class StudentEnrollment
 {
     public int Id { get; set; }
 
-    [Required, MaxLength(100)]
+    [Required, MaxLength(450)]
     public string StudentUserId { get; set; } = string.Empty;
     public ApplicationUser Student { get; set; } = null!;
 

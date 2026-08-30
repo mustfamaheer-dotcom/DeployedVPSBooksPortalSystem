@@ -50,7 +50,7 @@ public class RegistrationRequest
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ReviewedAt { get; set; }
 
-    [MaxLength(100)]
+    [MaxLength(450)]
     public string? ReviewedByUserId { get; set; }
 
     public int? CreatedTenantId { get; set; }

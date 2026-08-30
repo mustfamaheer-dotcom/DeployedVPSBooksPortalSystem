@@ -6,7 +6,7 @@ public class StudentBookAccess
 {
     public int Id { get; set; }
 
-    [Required, MaxLength(100)]
+    [Required, MaxLength(450)]
     public string StudentUserId { get; set; } = string.Empty;
     public ApplicationUser Student { get; set; } = null!;
 
@@ -16,7 +16,7 @@ public class StudentBookAccess
     public int TenantId { get; set; }
     public Tenant Tenant { get; set; } = null!;
 
-    [Required, MaxLength(100)]
+    [Required, MaxLength(450)]
     public string GrantedByUserId { get; set; } = string.Empty;
     public ApplicationUser GrantedByUser { get; set; } = null!;
 
