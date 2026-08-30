@@ -2,6 +2,7 @@
 @layout LoginLayout
 @inject NavigationManager Navigation
 @inject IServiceScopeFactory ScopeFactory
+@inject IJSRuntime JSRuntime
 
 <div class="lp-shell">
     <!-- ════════════════════════════════════════
@@ -104,31 +105,12 @@
 
             @if (!string.IsNullOrEmpty(successMessage))
             {
-                <div class="lp-error-banner" style="background: #ecfdf5; border-color: #d1fae5; color: #065f46;">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                        <polyline points="22 4 12 14.01 9 11.01"/>
-                    </svg>
-                    <span>@successMessage</span>
-                </div>
                 <div class="mt-4">
                     <a href="/login" class="lp-submit text-decoration-none text-center d-block">Go to Sign In</a>
                 </div>
             }
             else
             {
-                @if (!string.IsNullOrEmpty(error))
-                {
-                    <div class="lp-error-banner">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"/>
-                            <line x1="15" y1="9" x2="9" y2="15"/>
-                            <line x1="9" y1="9" x2="15" y2="15"/>
-                        </svg>
-                        <span>@error</span>
-                    </div>
-                }
-
                 <form @onsubmit="SubmitForm" @onsubmit:preventDefault autocomplete="off">
 
                     @if (activeTab == "student")
@@ -363,7 +345,7 @@
             {
                 if (selectedTenants.Count == 0)
                 {
-                    error = "Please select at least one teacher to enroll with.";
+                    await JSRuntime.InvokeVoidAsync("showToast", "Please select at least one teacher to enroll with.", "error");
                     isSubmitting = false;
                     return;
                 }
@@ -398,16 +380,31 @@
                     successMessage = "Account created successfully! Your enrollment requests are pending teacher approval.";
                 else
                     successMessage = "Registration request submitted successfully! We will review it shortly.";
+                    
+                await JSRuntime.InvokeVoidAsync("showToast", successMessage, "success");
             }
             else
             {
                 var responseBody = await response.Content.ReadAsStringAsync();
-                error = $"Failed to register: {response.StatusCode} {responseBody}";
+                
+                // Parse the JSON to extract just the error message if possible
+                string errorMessage = $"Failed to register: {response.StatusCode} {responseBody}";
+                try 
+                {
+                    var json = System.Text.Json.JsonDocument.Parse(responseBody);
+                    if (json.RootElement.TryGetProperty("error", out var errorProp))
+                    {
+                        errorMessage = errorProp.GetString() ?? errorMessage;
+                    }
+                }
+                catch { }
+
+                await JSRuntime.InvokeVoidAsync("showToast", errorMessage, "error");
             }
         }
         catch (Exception ex)
         {
-            error = "An error occurred while submitting. Please try again.";
+            await JSRuntime.InvokeVoidAsync("showToast", "An error occurred while submitting. Please try again.", "error");
             Console.WriteLine(ex);
         }
         finally

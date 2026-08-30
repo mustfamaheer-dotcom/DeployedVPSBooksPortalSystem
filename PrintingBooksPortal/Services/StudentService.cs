@@ -16,7 +16,7 @@ public class StudentService
         _userManager = userManager;
     }
 
-    public async Task<ApplicationUser?> RegisterStudentAsync(
+    public async Task<(ApplicationUser? User, IdentityResult Result)> RegisterStudentAsync(
         string fullName, string email, string password, List<int> tenantIds, string? studentNote)
     {
         var user = new ApplicationUser
@@ -31,7 +31,7 @@ public class StudentService
 
         var result = await _userManager.CreateAsync(user, password);
         if (!result.Succeeded)
-            return null;
+            return (null, result);
 
         await _userManager.AddToRoleAsync(user, "Student");
 
@@ -47,7 +47,7 @@ public class StudentService
         }
 
         await _db.SaveChangesAsync();
-        return user;
+        return (user, result);
     }
 
     public async Task<List<StudentEnrollment>> ListPendingEnrollmentsAsync(int tenantId)

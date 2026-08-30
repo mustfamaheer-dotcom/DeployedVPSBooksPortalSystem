@@ -36,9 +36,12 @@ public class RegistrationController : ControllerBase
         if (tenantIds == null || tenantIds.Count == 0)
             return BadRequest(new { success = false, error = "Must select at least one teacher" });
 
-        var user = await _studentService.RegisterStudentAsync(name, email, password, tenantIds, message);
-        if (user == null)
-            return BadRequest(new { success = false, error = "Failed to create user. Email may be taken." });
+        var result = await _studentService.RegisterStudentAsync(name, email, password, tenantIds, message);
+        if (result.User == null)
+        {
+            var errorMsg = result.Result.Errors.FirstOrDefault()?.Description ?? "Failed to create user. Email may be taken.";
+            return BadRequest(new { success = false, error = errorMsg });
+        }
 
         return Ok(new { success = true });
     }
