@@ -2,7 +2,7 @@
 @attribute [Authorize(Roles = "Student")]
 @rendermode InteractiveServer
 @inject StudentService Students
-@inject AppDbContext Db
+@inject IServiceScopeFactory ScopeFactory
 @inject UserManager<ApplicationUser> UserManager
 @inject NavigationManager Navigation
 
@@ -82,7 +82,9 @@
         var user = await UserManager.GetUserAsync(authState.User);
         if (user == null) return;
         
-        var tenant = await Db.Tenants.FindAsync(TenantId);
+        using var scope = ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var tenant = await db.Tenants.FindAsync(TenantId);
         if (tenant != null) teacherName = tenant.Name;
 
         books = await Students.GetStudentBooksAsync(user.Id, TenantId);

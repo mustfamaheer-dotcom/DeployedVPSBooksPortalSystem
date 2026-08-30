@@ -1,7 +1,7 @@
 @page "/admin/dashboard"
 @attribute [Authorize(Roles = "Teacher,SystemAdmin")]
 @rendermode InteractiveServer
-@inject AppDbContext Db
+@inject IServiceScopeFactory ScopeFactory
 @inject PrintLoggingService PrintLogging
 @inject ITenantContext TenantContext
 
@@ -371,18 +371,21 @@
 
     protected override async Task OnInitializedAsync()
     {
-        totalBooks = await Db.Books.CountAsync(b => b.IsActive);
-        activeShops = await Db.Shops.CountAsync(s => s.IsActive);
-        totalBoards = await Db.EducationalBoards.CountAsync(b => b.IsActive);
+        using var scope = ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        
+        totalBooks = await db.Books.CountAsync(b => b.IsActive);
+        activeShops = await db.Shops.CountAsync(s => s.IsActive);
+        totalBoards = await db.EducationalBoards.CountAsync(b => b.IsActive);
         totalPrints = await PrintLogging.GetTotalPrintsAsync();
         recentLogs = await PrintLogging.GetRecentLogsAsync(5);
         
         var tenantId = TenantContext.TenantId;
-        totalStudents = await Db.StudentEnrollments.CountAsync(e => e.TenantId == tenantId && e.Status == EnrollmentStatus.Approved);
-        pendingRequests = await Db.StudentEnrollments.CountAsync(e => e.TenantId == tenantId && e.Status == EnrollmentStatus.Pending);
+        totalStudents = await db.StudentEnrollments.CountAsync(e => e.TenantId == tenantId && e.Status == EnrollmentStatus.Approved);
+        pendingRequests = await db.StudentEnrollments.CountAsync(e => e.TenantId == tenantId && e.Status == EnrollmentStatus.Pending);
 
-        shops = await Db.Shops.Where(s => s.IsActive).OrderBy(s => s.Name).ToListAsync<Shop>();
-        var counts = await Db.PrintLogs
+        shops = await db.Shops.Where(s => s.IsActive).OrderBy(s => s.Name).ToListAsync<Shop>();
+        var counts = await db.PrintLogs
             .GroupBy(l => l.ShopId)
             .Select(g => new { ShopId = g.Key, Total = g.Sum(l => l.Copies) })
             .ToListAsync();
@@ -391,19 +394,22 @@
 
     private async Task OpenShop(Shop shop)
     {
+        using var scope = ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        
         selectedShop = shop;
-        shopBooks = await Db.ShopBookAssignments
+        shopBooks = await db.ShopBookAssignments
             .Where(a => a.ShopId == shop.Id && a.IsActive)
             .Include(a => a.Book)
             .ThenInclude(b => b.Board)
             .OrderBy(a => a.Book.Title)
             .ToListAsync();
-        var counts = await Db.PrintLogs.Where(l => l.ShopId == shop.Id)
+        var counts = await db.PrintLogs.Where(l => l.ShopId == shop.Id)
             .GroupBy(l => l.BookId)
             .Select(g => new { BookId = g.Key, Total = g.Sum(l => l.Copies) })
             .ToListAsync();
         bookPrintCounts = counts.ToDictionary(c => c.BookId, c => c.Total);
-        totalShopPrints = await Db.PrintLogs.Where(l => l.ShopId == shop.Id).SumAsync(l => l.Copies);
+        totalShopPrints = await db.PrintLogs.Where(l => l.ShopId == shop.Id).SumAsync(l => l.Copies);
         shopLogs = await PrintLogging.GetShopLogsAsync(shop.Id, 5);
     }
 

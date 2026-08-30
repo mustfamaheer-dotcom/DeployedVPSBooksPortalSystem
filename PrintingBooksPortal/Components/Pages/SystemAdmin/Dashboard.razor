@@ -1,7 +1,7 @@
 @page "/sa/dashboard"
 @attribute [Authorize(Roles = "SystemAdmin")]
 @inject SystemAdminService Sa
-@inject AppDbContext Db
+@inject IServiceScopeFactory ScopeFactory
 @inject PrintingBooksPortal.Services.ISettingsService Settings
 
 <div class="content-area dashboard-page">
@@ -183,7 +183,9 @@
         try
         {
             summary = await Sa.GetPlatformSummaryAsync();
-            pendingRegistrations = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync(Db.RegistrationRequests.Where(r => r.Status == RegistrationStatus.Pending));
+            using var scope = ScopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            pendingRegistrations = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync(db.RegistrationRequests.Where(r => r.Status == RegistrationStatus.Pending));
             isDevToolsEnabled = await Settings.IsDeveloperToolsEnabledAsync();
         }
         catch (Exception ex)

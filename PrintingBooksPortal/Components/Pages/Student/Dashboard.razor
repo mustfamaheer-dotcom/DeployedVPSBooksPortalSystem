@@ -4,7 +4,7 @@
 @inject StudentService Students
 @inject UserManager<ApplicationUser> UserManager
 @inject NavigationManager Navigation
-@inject AppDbContext Db
+@inject IServiceScopeFactory ScopeFactory
 
 <div class="content-area">
     <div class="page-header">
@@ -86,8 +86,11 @@
         
         userName = user.FullName ?? user.UserName ?? "";
 
+        using var scope = ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
         // Manually load since StudentService lists by tenantId instead of studentUserId
-        var allEnrollments = await Db.StudentEnrollments
+        var allEnrollments = await db.StudentEnrollments
             .Include(e => e.Tenant)
             .Where(e => e.StudentUserId == user.Id)
             .ToListAsync();
