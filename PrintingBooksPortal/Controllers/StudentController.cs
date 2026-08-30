@@ -59,6 +59,17 @@ public class StudentController : ControllerBase
 
         var pdfBytes = await System.IO.File.ReadAllBytesAsync(path);
 
+        // Check if watermark is enabled for this specific teacher (tenant)
+        var wmEnabledSetting = await _db.SystemSettings
+            .FirstOrDefaultAsync(s => s.Key == SystemSettingKeys.WatermarkEnabled && s.TenantId == access.TenantId);
+            
+        bool isWatermarkEnabled = wmEnabledSetting?.ValueBool ?? true;
+
+        if (!isWatermarkEnabled)
+        {
+            return File(pdfBytes, "application/pdf");
+        }
+
         string wmTemplate = await _settings.GetWatermarkTextAsync();
         
         // Q1 answer: Show student name on the watermark
