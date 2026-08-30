@@ -152,18 +152,52 @@ window.studentAnnotations = {
             var pos = self.getPointerPos(e);
             
             if (self.currentTool === 'text') {
-                var text = prompt("Enter note text:");
-                if (text) {
-                    self.addAnnotation({
-                        type: 'text',
-                        text: text,
-                        x: pos.x,
-                        y: pos.y,
-                        color: '#ef4444' // red notes
-                    });
-                    self.redrawAnnotations();
-                    self.saveAnnotations(false); // background save
-                }
+                var textModalEl = document.getElementById('textNoteModal');
+                if (!textModalEl) return;
+                
+                var textModal = bootstrap.Modal.getInstance(textModalEl) || new bootstrap.Modal(textModalEl);
+                var textInput = document.getElementById('textNoteInput');
+                var saveBtn = document.getElementById('saveTextNoteBtn');
+                
+                // Remove old event listeners to avoid multiple fires
+                var newSaveBtn = saveBtn.cloneNode(true);
+                saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
+                saveBtn = newSaveBtn;
+                
+                textInput.value = '';
+                textModal.show();
+                
+                // Focus input after modal is shown
+                textModalEl.addEventListener('shown.bs.modal', function () {
+                    textInput.focus();
+                }, { once: true });
+                
+                var handleSave = function() {
+                    var text = textInput.value.trim();
+                    if (text) {
+                        self.addAnnotation({
+                            type: 'text',
+                            text: text,
+                            x: pos.x,
+                            y: pos.y,
+                            color: '#ef4444' // red notes
+                        });
+                        self.redrawAnnotations();
+                        self.saveAnnotations(false); // background save
+                    }
+                    textModal.hide();
+                };
+                
+                saveBtn.addEventListener('click', handleSave);
+                
+                // Handle Enter key
+                textInput.onkeypress = function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSave();
+                    }
+                };
+                
                 return;
             }
             
