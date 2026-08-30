@@ -148,6 +148,8 @@
         if (user.IsInRole("Teacher")) return "Teacher";
         if (user.IsInRole("Admin")) return "Administrator";
         if (user.IsInRole("Shop")) return "Shop";
+        if (user.IsInRole("Student")) return "Student";
+        if (user.IsInRole("BookshopOwner")) return "Bookshop Owner";
         return "Guest";
     }
 
